@@ -433,12 +433,31 @@ ul.styled-list { /* Remove default list styling if ul is used */
 }
 
 /* Drag and Drop Styling for Exercises (within a session) */
-.exercise-drag-item.dragging-exercise { /* Class for the item being dragged */
+.exercise-drag-item.dragging-exercise {
     opacity: 0.4;
-    background-color: var(--nav-active-background); /* Different visual cue */
+    background-color: var(--nav-active-background);
 }
-.exercise-drag-item.drag-over-exercise { /* Class for item being dragged over */
-    border-top: 2px solid var(--button-success-hover-bg); /* Different color highlight */
+.exercise-drag-item.drag-over-exercise {
+    border-top: 2px solid var(--button-success-hover-bg);
+}
+
+/* Styling for Exercise Items within a Session's Exercise List */
+#exercise-list .list-item-container.exercise-drag-item {
+    background-color: var(--nav-background); /* Darker background for exercises */
+    /* border-color: var(--background-color); */ /* Optional: make border blend more with main bg */
+    max-width: 95%; /* Slightly less than full width */
+    margin-left: auto;  /* Center it */
+    margin-right: auto; /* Center it */
+}
+
+#exercise-list .list-item-container.exercise-drag-item:hover {
+    background-color: var(--nav-active-background); /* Hover consistent with nav items */
+    border-left-color: var(--primary-color); /* Keep accent consistent */
+}
+
+#exercise-list .list-item-container.exercise-drag-item > .button {
+    padding: 10px 15px; /* Slightly reduced padding for exercise item buttons */
+    font-size: 0.95em; /* Slightly smaller font for exercise names */
 }
 
 
