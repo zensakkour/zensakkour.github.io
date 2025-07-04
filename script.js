@@ -1593,7 +1593,19 @@ document.addEventListener('DOMContentLoaded', () => {
     async function populateWithProvidedData() {
         console.log("Populating with provided data...");
         const providedSessionData = [
-            // PUSH DAY - Date: 03/07/2025 (YYYY-MM-DD: 2025-07-03)
+            // NEW "session 1" (Push Day data) - Date: 2025-07-04
+            {
+                sessionName: "session 1", // As requested
+                date: "2025-07-04",
+                exercises: [
+                    { name: "Bench Press", sets: [{ weight: 70, reps: 7 }, { weight: 60, reps: 10 }, { weight: 60, reps: 6 }, { weight: 60, reps: 4 }] },
+                    { name: "Barbell Overhead Press", sets: [{ weight: 30, reps: 10 }, { weight: 30, reps: 8 }, { weight: 30, reps: 9 }] },
+                    { name: "Overhead Triceps Extension (Cable)", sets: [{ weight: 27, reps: 10 }, { weight: 27, reps: 10 }, { weight: 27, reps: 10 }] },
+                    { name: "Triceps Cable Push (Horizontal Bar)", sets: [{ weight: 50, reps: 9 }, { weight: 50, reps: 6 }, { weight: 45, reps: 0, note: "Drop Set to 36kg" }] }, // Assuming 0 reps for the start of drop set for now
+                    { name: "Cable Chest Flies", sets: [{ weight: 14, reps: 16 }, { weight: 18, reps: 10 }, { weight: 14, reps: 16 }, { weight: 18, reps: 7, note: "Drop Set" }] }
+                ]
+            },
+            // ORIGINAL PUSH DAY - Date: 03/07/2025 (YYYY-MM-DD: 2025-07-03)
             {
                 sessionName: "Push Day (Chest / Forearms / Triceps)",
                 date: "2025-07-03",

@@ -443,21 +443,43 @@ ul.styled-list { /* Remove default list styling if ul is used */
 
 /* Styling for Exercise Items within a Session's Exercise List */
 #exercise-list .list-item-container.exercise-drag-item {
-    background-color: var(--nav-background); /* Darker background for exercises */
-    /* border-color: var(--background-color); */ /* Optional: make border blend more with main bg */
-    max-width: 95%; /* Slightly less than full width */
-    margin-left: auto;  /* Center it */
-    margin-right: auto; /* Center it */
+    background-color: transparent; /* Transparent background */
+    border: none; /* Remove previous borders */
+    border-bottom: 1px solid var(--input-border); /* Bottom border for separation */
+    border-radius: 0; /* No border radius for a list-item feel */
+    max-width: 100%; /* Use full width of its parent */
+    margin-left: 0;
+    margin-right: 0;
+    margin-bottom: 0; /* Remove bottom margin if border is used */
+    padding: 0; /* Container itself has no padding, inner button will */
+    border-left: 4px solid transparent; /* Keep for hover, but initially transparent */
 }
 
 #exercise-list .list-item-container.exercise-drag-item:hover {
-    background-color: var(--nav-active-background); /* Hover consistent with nav items */
-    border-left-color: var(--primary-color); /* Keep accent consistent */
+    background-color: var(--nav-background); /* Subtle hover for the whole row */
+    border-left-color: var(--primary-color); /* Accent on hover */
 }
 
 #exercise-list .list-item-container.exercise-drag-item > .button {
-    padding: 10px 15px; /* Slightly reduced padding for exercise item buttons */
-    font-size: 0.95em; /* Slightly smaller font for exercise names */
+    background: transparent;
+    border: none;
+    box-shadow: none;
+    color: var(--on-surface-color);
+    padding: 12px 10px; /* Adjusted padding for new look */
+    font-size: 1em;   /* Reset font size or keep as is */
+    text-align: left;
+    flex-grow: 1;
+    border-radius: 0; /* Button itself has no radius */
+}
+#exercise-list .list-item-container.exercise-drag-item > .button:hover {
+    background-color: transparent; /* Hover is on container */
+}
+
+/* Ensure the #exercise-list itself has some padding if items are full width and transparent */
+#exercise-list {
+    list-style: none;
+    padding: 0; /* Remove default ul padding */
+    /* Add padding to #exercise-view-container's main content area if needed */
 }
 
 
