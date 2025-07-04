@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gym Progress Tracker</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <header>
+        <h1>Gym Progress Tracker</h1>
+    </header>
+    <nav>
+        <ul>
+            <li><a href="#sessions">Sessions</a></li>
+            <li><a href="#analysis">Analysis</a></li>
+        </ul>
+    </nav>
+    <main>
+        <section id="sessions">
+            <h2>Sessions</h2>
+            <div id="session-list">
+                <!-- Dynamically populated sessions -->
+            </div>
+            <div class="controls-group">
+                <input type="text" id="new-session-name" placeholder="New session name (e.g., Arms Day)">
+                <button id="add-session-btn" class="button-primary">Add Session</button>
+            </div>
+
+            <!-- Exercise List and Set Tracker will be part of the dynamic content area -->
+            <div id="exercise-view-container" style="display: none;">
+                <h3 id="current-session-title"></h3>
+                <div id="exercise-list"> <!-- This will now be a sub-list within the exercise view -->
+                    <!-- Dynamically populated exercises for the current session -->
+                </div>
+                <div class="controls-group">
+                    <input type="text" id="new-exercise-name" placeholder="New exercise (e.g., Bicep Curls)">
+                    <button id="add-exercise-btn" class="button-primary">Add Exercise to Session</button>
+                </div>
+                <button id="back-to-sessions-btn" class="button-secondary">Back to Sessions</button>
+            </div>
+
+            <div id="detailed-exercise-view-container" style="display: none;">
+                <h3 id="detailed-exercise-name"></h3>
+                <div class="controls-group">
+                    <button id="go-to-set-tracker-btn" class="button-success">Track New Set for this Exercise</button>
+                    <button id="back-to-exercise-list-from-detail-btn" class="button-secondary">Back to Session Exercises</button>
+                </div>
+                <h4>History for this Exercise (All Sessions):</h4>
+                <div id="detailed-exercise-history-list">
+                    <!-- Historical sets will be listed here -->
+                </div>
+                <h4>Progress Chart:</h4>
+                <div id="detailed-exercise-chart-container">
+                    <canvas id="detailedExerciseChart"></canvas>
+                </div>
+                <div id="one-rep-max-calculator" style="margin-top: 20px;">
+                    <h4>Estimated 1 Rep Max (1RM) Calculator</h4>
+                    <div class="controls-group">
+                        <label for="set-for-1rm-select">Select a recent set for 1RM calculation:</label>
+                        <select id="set-for-1rm-select">
+                            <option value="">-- Choose a Set --</option>
+                        </select>
+                        <button id="calculate-1rm-btn" class="button-primary">Calculate 1RM</button>
+                    </div>
+                    <p id="calculated-1rm-result">Estimated 1RM: -- kg</p>
+                    <!-- Optional: History of 1RMs could go here -->
+                </div>
+            </div>
+
+             <div id="set-tracker-container" style="display: none;">
+                <h3 id="current-exercise-title-set"></h3> <!-- Changed ID to avoid conflict -->
+                <div id="sets-list">
+                    <!-- Dynamically populated sets -->
+                </div>
+                <div class="controls-group">
+                    <input type="number" id="set-weight" placeholder="Weight (kg) - e.g., 70">
+                    <input type="number" id="set-reps" placeholder="Reps - e.g., 10">
+                    <button id="add-set-btn" class="button-success">Add Set</button>
+                </div>
+                <button id="back-to-exercises-btn" class="button-secondary">Back to Exercises</button>
+            </div>
+        </section>
+
+        <section id="body-weight" style="display: none;"> <!-- New Body Weight Section -->
+            <h2>Body Weight Log</h2>
+            <div class="controls-group">
+                <input type="date" id="body-weight-date">
+                <input type="number" id="body-weight-input" placeholder="Weight (kg) - e.g., 75.5">
+                <button id="add-body-weight-btn" class="button-primary">Log Weight</button>
+            </div>
+            <div id="body-weight-history">
+                <!-- Body weight entries will be listed here -->
+            </div>
+        </section>
+
+        <section id="analysis">
+            <h2>Analysis</h2>
+            <p>Select an exercise or data type to see your progress.</p>
+            <div class="controls-group analysis-controls"> <!-- Applied controls-group -->
+                <label for="analysis-data-type-select">Data Type:</label>
+                <select id="analysis-data-type-select">
+                    <option value="exercise">Exercise Progress (Single)</option>
+                    <option value="bodyweight">Body Weight</option>
+                    <option value="volume_comparison_exercises">Volume Comparison (Exercises)</option>
+                    <!-- <option value="volume_comparison_sessions">Volume Comparison (Sessions)</option> -->
+                </select>
+                <div id="exercise-select-group-analysis" style="display: inline-block;">
+                    <label for="exercise-select-analysis" id="exercise-select-label-analysis">Exercise:</label>
+                    <select id="exercise-select-analysis">
+                        <option value="">--Select Exercise--</option>
+                    </select>
+                </div>
+                <div id="multi-exercise-select-group-analysis" style="display: none;">
+                    <label for="multi-exercise-select-analysis">Compare Exercises (select multiple):</label>
+                    <select id="multi-exercise-select-analysis" multiple size="5">
+                        <!-- Options populated by JS -->
+                    </select>
+                    <button id="generate-volume-comparison-btn" class="button-primary">Generate Chart</button>
+                </div>
+            </div>
+            <div id="progress-chart-container" style="display: none;">
+                <canvas id="progressChart"></canvas>
+            </div>
+            <div id="raw-data-container">
+                <h4>Raw Data:</h4>
+                <pre id="raw-data-output"></pre>
+            </div>
+        </section>
+    </main>
+    <footer>
+        <p>&copy; 2023 Gym Progress Tracker</p>
+    </footer>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="script.js"></script>
+</body>
+</html>
