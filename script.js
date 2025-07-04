@@ -121,14 +121,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
     async function loadData() {
         if (!db) {
-            console.error("DB not initialized. Call initDB first.");
-            // Attempt to initialize if not already done, though init should be called at startup
-            try {
-                await initDB();
-            } catch (error) {
-                gymData = { sessions: [], bodyWeightLog: [] }; // Fallback
-                return;
-            }
+            // This should ideally not happen if loadData is called correctly after initDB.
+            console.error("DB not initialized when loadData was called. This indicates an issue in the calling sequence.");
+            gymData = { sessions: [], bodyWeightLog: [] }; // Fallback to empty
+            return Promise.reject(new Error("Database not initialized for loadData.")); // Reject promise
         }
 
         const transaction = db.transaction(['sessions', 'bodyWeightLog'], 'readonly');
@@ -1203,24 +1199,18 @@ document.addEventListener('DOMContentLoaded', () => {
             exerciseSelectGroupAnalysis.style.display = 'inline-block';
             if(exerciseSelectAnalysis.value) {
                 progressChartContainer.style.display = 'block';
-                // rawDataContainer.style.display = 'block'; // Removed
                 displayProgressForExercise(exerciseSelectAnalysis.value);
             } else {
                 progressChartContainer.style.display = 'none';
-                // rawDataContainer.style.display = 'none'; // Removed
                 if (progressChart) progressChart.destroy();
-                // rawDataOutput.textContent = "Select an exercise to see its progress."; // Removed
             }
         } else if (selectedType === 'bodyweight') {
-            // exerciseSelectGroupAnalysis is already hidden by default
-            // multiExerciseSelectGroupAnalysis is already hidden by default
             displayBodyWeightProgress();
         } else if (selectedType === 'volume_comparison_exercises') {
             multiExerciseSelectGroupAnalysis.style.display = 'block';
             populateMultiExerciseSelect();
             if (progressChart) progressChart.destroy();
             progressChartContainer.style.display = 'none';
-            // rawDataOutput.textContent = "Select exercises (Ctrl/Cmd + Click or Shift + Click) and click 'Generate Chart' to compare volumes."; // Removed
         }
     }
 
@@ -1259,19 +1249,17 @@ document.addEventListener('DOMContentLoaded', () => {
 
 
     function displayProgressForExercise(exerciseName) {
-        rawDataOutput.textContent = '';
+        // rawDataOutput.textContent = ''; // Removed
         if (progressChart) {
             progressChart.destroy();
         }
 
         if (!exerciseName) {
             document.getElementById('progress-chart-container').style.display = 'none';
-            // document.getElementById('raw-data-container').style.display = 'none'; // Removed
             return;
         }
 
         document.getElementById('progress-chart-container').style.display = 'block';
-        // document.getElementById('raw-data-container').style.display = 'block'; // Removed
 
         const exerciseDataPoints = [];
         gymData.sessions.forEach(session => {
@@ -1326,19 +1314,10 @@ document.addEventListener('DOMContentLoaded', () => {
         exerciseDataPoints.sort((a, b) => a.timestamp - b.timestamp);
 
         if (exerciseDataPoints.length === 0) {
-            // rawDataOutput.textContent = "No data recorded for this exercise yet."; // Removed
             if (progressChart) progressChart.destroy();
              document.getElementById('progress-chart-container').style.display = 'none';
             return;
         }
-
-        // rawDataOutput.textContent = JSON.stringify(exerciseDataPoints.map(dp => ({ // Removed
-        //     date: dp.timestamp.toLocaleDateString(),
-        //     time: dp.timestamp.toLocaleTimeString(),
-        //     weight: dp.weight,
-        //     reps: dp.reps,
-        //     volume: dp.volume
-        // })), null, 2);
 
         const labels = exerciseDataPoints.map(dp => dp.timestamp.toLocaleDateString() + ' ' + dp.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
         const weightData = exerciseDataPoints.map(dp => dp.weight);
@@ -1373,13 +1352,11 @@ document.addEventListener('DOMContentLoaded', () => {
             progressChart.destroy();
         }
         if (!selectedExerciseNames || selectedExerciseNames.length === 0) {
-            // rawDataOutput.textContent = "Please select at least one exercise to compare volumes."; // Removed
             document.getElementById('progress-chart-container').style.display = 'none';
             return;
         }
 
         document.getElementById('progress-chart-container').style.display = 'block';
-        // rawDataOutput.textContent = ''; // Removed
 
         const datasets = [];
         const allTimestamps = new Set();
@@ -1593,7 +1570,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     async function populateWithProvidedData() {
-        console.log("Populating with provided data...");
+        console.log("Populating with provided data (Improved ID generation)...");
         const providedSessionData = [
             // NEW "session 1" (Push Day data) - Date: 2025-07-04
             {
@@ -1603,7 +1580,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     { name: "Bench Press", sets: [{ weight: 70, reps: 7 }, { weight: 60, reps: 10 }, { weight: 60, reps: 6 }, { weight: 60, reps: 4 }] },
                     { name: "Barbell Overhead Press", sets: [{ weight: 30, reps: 10 }, { weight: 30, reps: 8 }, { weight: 30, reps: 9 }] },
                     { name: "Overhead Triceps Extension (Cable)", sets: [{ weight: 27, reps: 10 }, { weight: 27, reps: 10 }, { weight: 27, reps: 10 }] },
-                    { name: "Triceps Cable Push (Horizontal Bar)", sets: [{ weight: 50, reps: 9 }, { weight: 50, reps: 6 }, { weight: 45, reps: 0, note: "Drop Set to 36kg" }] }, // Assuming 0 reps for the start of drop set for now
+                    { name: "Triceps Cable Push (Horizontal Bar)", sets: [{ weight: 50, reps: 9 }, { weight: 50, reps: 6 }, { weight: 45, reps: 0, note: "Drop Set to 36kg" }] },
                     { name: "Cable Chest Flies", sets: [{ weight: 14, reps: 16 }, { weight: 18, reps: 10 }, { weight: 14, reps: 16 }, { weight: 18, reps: 7, note: "Drop Set" }] }
                 ]
             },
@@ -1658,31 +1635,34 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         ];
 
+        let idCounter = 1; // Simple counter for pre-filled IDs
+
         for (const [index, sessionData] of providedSessionData.entries()) {
-            const sessionTimestamp = new Date(sessionData.date).toISOString(); // Use provided date for timestamp
+            const sessionTimestamp = new Date(sessionData.date).toISOString();
 
             const newSession = {
-                id: Date.now() + index, // More robust unique ID generation
+                id: `prefill-session-${idCounter++}`,
                 name: sessionData.sessionName,
-                date: sessionData.date, // YYYY-MM-DD format
-                sortOrder: index, // Assign sort order based on array position
+                date: sessionData.date,
+                sortOrder: index,
                 exercises: sessionData.exercises.map((exData, exIndex) => ({
-                    id: Date.now() + index + 1000 + exIndex, // More robust unique ID
+                    id: `prefill-exercise-${idCounter++}`,
                     name: exData.name,
                     note: exData.note || "",
-                    order: exIndex, // Assign order for exercises within session
+                    order: exIndex,
                     sets: exData.sets.map((setData, setIndex) => ({
-                        id: Date.now() + index + 2000 + exIndex + setIndex, // More robust unique ID
-                        weight: setData.weight || 0, // Default to 0 if not specified
-                        reps: setData.reps || 0,     // Default to 0 if not specified
-                        timestamp: sessionTimestamp, // Use session's date as timestamp for all its sets
+                        id: `prefill-set-${idCounter++}`,
+                        weight: setData.weight || 0,
+                        reps: setData.reps || 0,
+                        timestamp: sessionTimestamp,
                         note: setData.note || ""
                     }))
                 }))
             };
+            console.log("Constructed session for pre-fill:", JSON.parse(JSON.stringify(newSession)));
             try {
                 await dbPut('sessions', newSession);
-                console.log(`Prefilled session: ${newSession.name} for date ${newSession.date}`);
+                console.log(`Successfully put session to DB: ${newSession.name} for date ${newSession.date}`);
             } catch (err) {
                 console.error(`Error prefilling session ${newSession.name}:`, err);
             }
