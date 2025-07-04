@@ -112,20 +112,18 @@
                     </select>
                 </div>
                 <div id="multi-exercise-select-group-analysis" style="display: none;">
-                    <label for="multi-exercise-select-analysis">Compare Exercises (select multiple):</label>
+                    <label for="multi-exercise-select-analysis">Compare Exercises:</label>
                     <select id="multi-exercise-select-analysis" multiple size="5">
                         <!-- Options populated by JS -->
                     </select>
+                    <small class="form-hint">Hold Ctrl (Cmd on Mac) to select multiple items, or Shift to select a range.</small>
                     <button id="generate-volume-comparison-btn" class="button-primary">Generate Chart</button>
                 </div>
             </div>
             <div id="progress-chart-container" style="display: none;">
                 <canvas id="progressChart"></canvas>
             </div>
-            <div id="raw-data-container">
-                <h4>Raw Data:</h4>
-                <pre id="raw-data-output"></pre>
-            </div>
+            <!-- Raw data container removed -->
         </section>
     </main>
     <footer>
