@@ -33,9 +33,10 @@ body {
 header {
     background-color: var(--header-background);
     color: #fff;
-    padding: 1.2em 0; /* Slightly reduced padding */
+    padding: 1.2em 20px; /* Added horizontal padding for corner element */
     text-align: center;
     border-bottom: 2px solid var(--primary-color); /* Accent border */
+    position: relative; /* Positioning context for #user-status */
 }
 
 header h1 {
@@ -637,21 +638,27 @@ ul.styled-list { /* Remove default list styling if ul is used */
     display: flex; /* Use flex for better alignment */
     justify-content: space-between; /* Space out email and button */
     align-items: center;
-    background-color: var(--nav-background); /* Use nav background for contrast */
+    background-color: transparent; /* Make it less obtrusive in the corner */
     color: var(--on-surface-color);
-    padding: 10px 15px; /* Adjusted padding */
-    margin: 0 auto 1.5em auto; /* Center and provide bottom margin */
-    max-width: 450px; /* Match auth-container width */
-    border-radius: 8px; /* Rounded corners */
-    border: 1px solid var(--input-border);
+    padding: 5px 10px; /* Smaller padding */
+    position: absolute;
+    top: 10px; /* Adjust as needed */
+    right: 20px; /* Adjust as needed, matches header padding */
+    border-radius: 5px;
+    /* border: 1px solid var(--input-border); Optional: if you want a border */
     box-sizing: border-box;
+    max-width: none; /* Remove max-width for corner placement */
+    margin: 0; /* Remove auto margins */
 }
 #user-status span#user-email { /* More specific selector */
     font-weight: 500; /* Bolder email */
+    margin-right: 10px; /* Space between email and button */
+    font-size: 0.9em; /* Slightly smaller */
 }
 #user-status button#logout-btn.button-secondary { /* More specific selector */
-    margin: 0; /* Reset margin if any from general button style */
-    padding: 8px 15px; /* Custom padding for logout button */
+    margin: 0; /* Reset margin */
+    padding: 6px 12px; /* Smaller button */
+    font-size: 0.9em; /* Smaller button text */
 }
 
 /* Initially hide main content and nav until login */

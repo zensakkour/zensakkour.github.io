@@ -74,10 +74,16 @@ document.addEventListener('DOMContentLoaded', () => {
     const calculate1RMBtn = document.getElementById('calculate-1rm-btn');
     const calculated1RMResultEl = document.getElementById('calculated-1rm-result');
 
+    // Profile section DOM elements
+    const profileUsernameInput = document.getElementById('profile-username');
+    const saveProfileBtn = document.getElementById('save-profile-btn');
+    const profileFeedbackDiv = document.getElementById('profile-feedback');
+
+
     let currentSessionId = null;
     let currentExerciseId = null;
     let currentViewingExerciseName = null;
-    let currentUser = null;
+    let currentUser = null; // Holds user object from Supabase, including profile data after load
 
     // --- Supabase Data Functions ---
 
@@ -944,7 +950,72 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (targetId === 'sessions') { showSessionListView(); renderSessions(); }
                 else if (targetId === 'analysis') { populateExerciseSelect(); handleAnalysisTypeChange(); }
                 else if (targetId === 'body-weight') { renderBodyWeightHistory(); bodyWeightDateInput.valueAsDate = new Date(); }
+                else if (targetId === 'profile') {
+                    // Populate username when profile tab is clicked
+                    if (currentUser && currentUser.username) {
+                        profileUsernameInput.value = currentUser.username;
+                    } else {
+                        profileUsernameInput.value = ''; // Clear if no username yet
+                    }
+                    profileFeedbackDiv.style.display = 'none'; // Clear old feedback
+                    profileFeedbackDiv.textContent = '';
+                }
             });
+        });
+    }
+
+    if (saveProfileBtn) { // Ensure button exists before adding listener
+        saveProfileBtn.addEventListener('click', async () => {
+            if (!currentUser) {
+                showFeedback("You must be logged in to save your profile.", true, profileFeedbackDiv);
+                return;
+            }
+            const newUsername = profileUsernameInput.value.trim();
+            // Basic validation: not empty, maybe some character restrictions later
+            if (!newUsername) {
+                showFeedback("Username cannot be empty.", true, profileFeedbackDiv);
+                return;
+            }
+            // Optional: Add more sophisticated validation for username (e.g., regex)
+            // For example, to allow only alphanumeric and underscores, min 3 chars:
+            // if (!/^[a-zA-Z0-9_]{3,}$/.test(newUsername)) {
+            //     showFeedback("Username can only contain letters, numbers, underscores, and be at least 3 characters long.", true, profileFeedbackDiv);
+            //     return;
+            // }
+
+
+            showFeedback("Saving username...", false, profileFeedbackDiv);
+            try {
+                const { data, error } = await supabaseClient
+                    .from('profiles')
+                    .update({ username: newUsername, updated_at: new Date().toISOString() })
+                    .eq('id', currentUser.id)
+                    .select()
+                    .single();
+
+                if (error) {
+                    // Check for unique constraint violation (Supabase error code 23505 for PostgreSQL)
+                    if (error.code === '23505') {
+                        throw new Error("This username is already taken. Please choose another.");
+                    }
+                    throw error;
+                }
+
+                if (data) {
+                    currentUser.username = data.username; // Update local currentUser object
+                    if (currentUser.username) { // Update display in header
+                        userEmailSpan.textContent = currentUser.username;
+                    } else {
+                        userEmailSpan.textContent = currentUser.email;
+                    }
+                    showFeedback("Username saved successfully!", false, profileFeedbackDiv);
+                } else {
+                     showFeedback("Profile not found or no changes made.", true, profileFeedbackDiv); // Should not happen if RLS is correct
+                }
+            } catch (error) {
+                console.error("Error saving username:", error);
+                showFeedback(`Error saving username: ${error.message}`, true, profileFeedbackDiv);
+            }
         });
     }
 
@@ -1125,17 +1196,25 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     // --- Feedback Toast Function ---
-    function showFeedback(message, isError = false) { // Added isError flag
-        const feedbackToast = document.createElement('div');
-        feedbackToast.textContent = message;
-        feedbackToast.className = 'feedback-toast';
-        if (isError) feedbackToast.style.backgroundColor = 'var(--button-danger-bg)';
-        document.body.appendChild(feedbackToast);
-        setTimeout(() => { feedbackToast.classList.add('show'); }, 10);
-        setTimeout(() => {
-            feedbackToast.classList.remove('show');
-            setTimeout(() => { document.body.removeChild(feedbackToast); }, 500);
-        }, isError ? 4000 : 2500); // Longer display for errors
+    function showFeedback(message, isError = false, targetDiv = null) {
+        if (targetDiv) {
+            targetDiv.textContent = message;
+            targetDiv.style.backgroundColor = isError ? 'var(--button-danger-bg)' : 'var(--button-success-bg)';
+            targetDiv.style.color = 'white'; // Ensure text is visible
+            targetDiv.style.display = 'block';
+            // No automatic hide for targeted feedback, user can see it until next action clears it.
+        } else {
+            const feedbackToast = document.createElement('div');
+            feedbackToast.textContent = message;
+            feedbackToast.className = 'feedback-toast';
+            if (isError) feedbackToast.style.backgroundColor = 'var(--button-danger-bg)';
+            document.body.appendChild(feedbackToast);
+            setTimeout(() => { feedbackToast.classList.add('show'); }, 10);
+            setTimeout(() => {
+                feedbackToast.classList.remove('show');
+                setTimeout(() => { document.body.removeChild(feedbackToast); }, 500);
+            }, isError ? 4000 : 2500);
+        }
     }
 
     // --- Authentication Logic & Initial UI Setup ---
@@ -1162,30 +1241,70 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
+    async function loadUserProfile() {
+        if (!currentUser) return;
+        try {
+            const { data: profile, error } = await supabaseClient
+                .from('profiles')
+                .select('username, avatar_url')
+                .eq('id', currentUser.id)
+                .single();
+
+            if (error && error.code !== 'PGRST116') { // PGRST116: 'No rows found' which is fine for new users
+                throw error;
+            }
+            if (profile) {
+                currentUser.username = profile.username;
+                currentUser.avatar_url = profile.avatar_url;
+                console.log("User profile loaded:", currentUser);
+            } else {
+                console.log("No profile found for user, can be created.");
+                currentUser.username = null; // Ensure it's explicitly null if no profile
+            }
+            // Update display after loading profile
+            if (currentUser.username) {
+                userEmailSpan.textContent = currentUser.username;
+            } else {
+                userEmailSpan.textContent = currentUser.email; // Fallback to email
+            }
+        } catch (error) {
+            console.error("Error loading user profile:", error);
+            showFeedback("Could not load user profile.", true);
+            userEmailSpan.textContent = currentUser.email; // Fallback to email on error
+        }
+    }
+
     async function initializeAppData() {
         setupNavEventListeners(); // Ensure nav links work correctly
-        // Default to sessions view
+
+        await loadData(); // Load gym data (sessions, bodyweight)
+        await loadUserProfile(); // Load user profile (username, etc.)
+
+        // Default to sessions view after all data is loaded
         document.getElementById('sessions').style.display = 'block';
         document.getElementById('body-weight').style.display = 'none';
         analysisSection.style.display = 'none';
+        const profileSection = document.getElementById('profile');
+        if(profileSection) profileSection.style.display = 'none';
+
         document.querySelectorAll('nav ul li a').forEach(nl => nl.classList.remove('active'));
         const sessionsNavLink = document.querySelector('nav ul li a[href="#sessions"]');
         if (sessionsNavLink) sessionsNavLink.classList.add('active');
 
-        await loadData(); // Load data from Supabase
-
         // Initial rendering after data load
-        showSessionListView(); // Sets currentSessionId to null, renders sessions
-        renderBodyWeightHistory(); // Renders body weight
-        bodyWeightDateInput.valueAsDate = new Date(); // Default date
-        populateExerciseSelect(); // For analysis tab
-        handleAnalysisTypeChange(); // For analysis tab
-        // displayProgressForExercise(""); // Clear analysis chart initially
+        showSessionListView();
+        renderBodyWeightHistory();
+        bodyWeightDateInput.valueAsDate = new Date();
+        populateExerciseSelect();
+        handleAnalysisTypeChange();
     }
 
     supabaseClient.auth.onAuthStateChange(async (event, session) => {
         console.log('Auth event:', event, 'Session:', session);
-        updateUIForAuthState(session ? session.user : null);
+        const user = session ? session.user : null;
+        // If user state changes, call updateUIForAuthState.
+        // updateUIForAuthState will then call initializeAppData if it's a login.
+        updateUIForAuthState(user);
     });
 
     showSignupLink.addEventListener('click', (e) => {
