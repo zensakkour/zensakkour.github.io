@@ -44,7 +44,7 @@ header h1 {
     font-weight: 600; /* Bolder title */
 }
 
-nav {
+nav { /* This will be controlled by JS based on auth state */
     background-color: var(--nav-background);
     padding: 0.75em 0; /* Increased padding */
     box-shadow: var(--box-shadow);
@@ -76,7 +76,7 @@ nav ul li a:hover, nav ul li a.active {
     color: var(--primary-color); /* Highlight active link text */
 }
 
-main {
+main { /* This will be controlled by JS based on auth state */
     padding: 2em; /* Increased padding */
     max-width: 1200px; /* Max width for content */
     margin: 0 auto; /* Center content */
@@ -578,4 +578,84 @@ ul.styled-list { /* Remove default list styling if ul is used */
 }
 #generate-volume-comparison-btn {
     margin-top: 10px;
+}
+
+/* Authentication Styles */
+#auth-container {
+    background-color: var(--surface-color);
+    padding: 1.5em 2em; /* Increased padding */
+    margin: 1.5em auto; /* Increased margin */
+    max-width: 450px; /* Slightly wider */
+    border-radius: 10px; /* Consistent with sections */
+    box-shadow: var(--box-shadow);
+}
+
+#auth-container h3 {
+    color: var(--primary-color);
+    text-align: center;
+    margin-top: 0; /* Remove top margin if it's the first element */
+    margin-bottom: 1.2em; /* Increased bottom margin */
+    font-size: 1.5em; /* Larger heading */
+}
+
+#auth-container input[type="email"],
+#auth-container input[type="password"] {
+    width: 100%; /* Full width */
+    box-sizing: border-box; /* Include padding and border in the element's total width and height */
+    padding: 12px;
+    margin-bottom: 12px; /* Increased margin */
+    border: 1px solid var(--input-border);
+    background-color: var(--input-background);
+    color: var(--on-surface-color);
+    border-radius: 5px;
+    font-size: 1em;
+}
+
+#auth-container button[type="submit"].button-primary { /* More specific selector */
+    width: 100%;
+    padding: 12px;
+    margin-top: 10px;
+    font-size: 1.1em; /* Slightly larger button text */
+}
+
+#auth-container p {
+    text-align: center;
+    margin-top: 1.2em; /* Increased margin */
+    font-size: 0.95em; /* Slightly larger text */
+}
+
+#auth-container a#show-signup, #auth-container a#show-login { /* Target specific links if needed */
+    color: var(--primary-color);
+    text-decoration: none;
+    font-weight: 500; /* Slightly bolder link */
+}
+#auth-container a#show-signup:hover, #auth-container a#show-login:hover {
+    text-decoration: underline;
+}
+
+#user-status {
+    display: flex; /* Use flex for better alignment */
+    justify-content: space-between; /* Space out email and button */
+    align-items: center;
+    background-color: var(--nav-background); /* Use nav background for contrast */
+    color: var(--on-surface-color);
+    padding: 10px 15px; /* Adjusted padding */
+    margin: 0 auto 1.5em auto; /* Center and provide bottom margin */
+    max-width: 450px; /* Match auth-container width */
+    border-radius: 8px; /* Rounded corners */
+    border: 1px solid var(--input-border);
+    box-sizing: border-box;
+}
+#user-status span#user-email { /* More specific selector */
+    font-weight: 500; /* Bolder email */
+}
+#user-status button#logout-btn.button-secondary { /* More specific selector */
+    margin: 0; /* Reset margin if any from general button style */
+    padding: 8px 15px; /* Custom padding for logout button */
+}
+
+/* Initially hide main content and nav until login */
+/* These will be controlled by JS by adding/removing a 'hidden' class or setting style.display */
+.hidden {
+    display: none !important;
 }
