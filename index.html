@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gym Progress Tracker</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <header>
+        <h1>Gym Progress Tracker</h1>
+    </header>
+    <nav>
+        <ul>
+            <li><a href="#sessions">Sessions</a></li>
+            <li><a href="#analysis">Analysis</a></li>
+        </ul>
+    </nav>
+    <main>
+        <section id="sessions">
+            <h2>Sessions</h2>
+            <div id="session-list">
+                <!-- Dynamically populated sessions -->
+            </div>
+            <div class="add-session-controls">
+                <input type="text" id="new-session-name" placeholder="New session name (e.g., Arms Day)">
+                <button id="add-session-btn">Add Session</button>
+            </div>
+            <div id="exercise-list-container" style="display: none;">
+                <h3 id="current-session-title"></h3>
+                <ul id="exercise-list">
+                    <!-- Dynamically populated exercises -->
+                </ul>
+                <div class="add-exercise-controls">
+                    <input type="text" id="new-exercise-name" placeholder="New exercise (e.g., Bicep Curls)">
+                    <button id="add-exercise-btn">Add Exercise</button>
+                </div>
+            </div>
+             <div id="set-tracker-container" style="display: none;">
+                <h4 id="current-exercise-title"></h4>
+                <div id="sets-list">
+                    <!-- Dynamically populated sets -->
+                </div>
+                <div class="add-set-controls">
+                    <input type="number" id="set-weight" placeholder="Weight (kg)">
+                    <input type="number" id="set-reps" placeholder="Reps">
+                    <button id="add-set-btn">Add Set</button>
+                </div>
+                <button id="back-to-exercises-btn">Back to Exercises</button>
+            </div>
+        </section>
+        <section id="analysis">
+            <h2>Analysis</h2>
+            <p>Select an exercise to see your progress. (More detailed analysis coming soon!)</p>
+            <div class="analysis-controls">
+                <label for="exercise-select-analysis">Choose an exercise:</label>
+                <select id="exercise-select-analysis">
+                    <option value="">--Select Exercise--</option>
+                </select>
+            </div>
+            <div id="progress-chart-container">
+                <!-- Chart will be rendered here by Chart.js -->
+                <canvas id="progressChart"></canvas>
+            </div>
+            <div id="raw-data-container">
+                <h4>Raw Data:</h4>
+                <pre id="raw-data-output"></pre>
+            </div>
+        </section>
+    </main>
+    <footer>
+        <p>&copy; 2023 Gym Progress Tracker</p>
+    </footer>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="script.js"></script>
+</body>
+</html>
