@@ -1482,38 +1482,40 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- Initial Setup ---
     // Initialize DB first, then load data, then set up UI
     initDB()
-        .then(() => loadData())
+        .then(() => loadData()) // Step 1: Load any existing data (or initialize gymData if DB is new)
+        .then(() => prefillDataIfEmpty()) // Step 2: Potentially clear DB and pre-fill new data
+        .then(() => loadData()) // Step 3: Load data again to ensure gymData has pre-filled data if that ran
         .then(() => {
-            // Start with the sessions section visible and others hidden
+            // Step 4: NOW set up and render the UI with the definitive state of gymData
+            console.log("Final gymData before initial render:", JSON.parse(JSON.stringify(gymData)));
+
             document.getElementById('sessions').style.display = 'block';
             document.getElementById('body-weight').style.display = 'none';
             analysisSection.style.display = 'none';
             document.querySelector('nav ul li a[href="#sessions"]').classList.add('active');
 
-            // Add Body Weight to nav - This should ideally be static in HTML or done more robustly
-            // For now, keeping the JS dynamic addition but ensuring it's after DB/data load
             if (!document.querySelector('nav ul li a[href="#body-weight"]')) {
                 const bodyWeightNavLinkItem = document.createElement('li');
                 bodyWeightNavLinkItem.innerHTML = '<a href="#body-weight">Body Weight</a>';
                 const analysisLinkItem = document.querySelector('nav ul li a[href="#analysis"]').parentElement;
-                document.querySelector('nav ul').insertBefore(bodyWeightNavLinkItem, analysisLinkItem);
+                if (analysisLinkItem) { // Ensure analysisLinkItem exists before inserting
+                    document.querySelector('nav ul').insertBefore(bodyWeightNavLinkItem, analysisLinkItem);
+                } else { // Fallback if analysis link isn't there for some reason
+                    document.querySelector('nav ul').appendChild(bodyWeightNavLinkItem);
+                }
             }
 
-            // Re-query navLinks to include any dynamically added ones and attach event listeners
             const allNavLinks = document.querySelectorAll('nav ul li a');
-            const sections = document.querySelectorAll('main section'); // Ensure sections is defined here
+            const sections = document.querySelectorAll('main section');
             allNavLinks.forEach(link => {
                 link.addEventListener('click', (e) => {
                     e.preventDefault();
                     const targetId = link.getAttribute('href').substring(1);
-
                     sections.forEach(section => {
                         section.style.display = (section.id === targetId) ? 'block' : 'none';
                     });
-
                     allNavLinks.forEach(navLink => navLink.classList.remove('active'));
                     link.classList.add('active');
-
                     if (targetId === 'sessions') {
                         showSessionListView();
                         renderSessions();
@@ -1535,59 +1537,48 @@ document.addEventListener('DOMContentLoaded', () => {
             populateExerciseSelect();
             handleAnalysisTypeChange();
             displayProgressForExercise("");
-
-            prefillDataIfEmpty(); // Check and prefill data if DB is empty
         })
         .catch(error => {
-            console.error("Failed to initialize DB or load data:", error);
+            console.error("Failed to initialize DB or load/prefill data:", error);
             alert("Application could not start correctly. Please try refreshing. If the problem persists, your browser might not support IndexedDB or is in private mode.");
-            gymData = { sessions: [], bodyWeightLog: [] };
-            renderSessions();
+            gymData = { sessions: [], bodyWeightLog: [] }; // Fallback
+            renderSessions(); // Attempt to render with empty data
         });
 
     // --- Data Pre-fill ---
-    // IMPORTANT: This pre-fill logic should ideally run ONLY ONCE, e.g., on first load or when DB is empty.
-    // A more robust way would be to check a flag in localStorage or a special entry in IndexedDB.
-    // For this exercise, it will run if the sessions store is empty.
-
     async function prefillDataIfEmpty() {
         if (!db) {
             console.warn("DB not ready for prefill check.");
-            return;
+            return Promise.resolve(); // Resolve if DB not ready, so main chain continues
         }
-        const transaction = db.transaction(['sessions'], 'readonly');
-        const sessionStore = transaction.objectStore('sessions');
 
-        // Clear existing sessions first for this specific request
-        console.warn("DEVELOPMENT: Clearing all existing sessions before pre-fill as per current task requirement.");
-        const clearRequest = sessionStore.clear();
+        return new Promise((resolve, reject) => {
+            // For this specific request, we always clear and prefill.
+            // For a production app, you'd check if prefill is needed (e.g., countRequest.result === 0)
+            const transaction = db.transaction(['sessions'], 'readwrite');
+            const sessionStore = transaction.objectStore('sessions');
 
-        clearRequest.onsuccess = async () => {
-            console.log("All sessions cleared from DB. Proceeding with pre-fill.");
-            showFeedback("Setting up initial data (existing sessions cleared)...");
-            await populateWithProvidedData();
-            // After pre-filling, reload data into gymData and re-render
-            await loadData(); // Reload gymData from DB
-            renderSessions(); // Re-render UI
-            renderBodyWeightHistory();
-            populateExerciseSelect();
-            handleAnalysisTypeChange(); // Ensure correct analysis view
-            if (analysisDataTypeSelect.value === 'exercise' && exerciseSelectAnalysis.value) {
-                 displayProgressForExercise(exerciseSelectAnalysis.value);
-            } else if (analysisDataTypeSelect.value === 'bodyweight') {
-                displayBodyWeightProgress();
-            } else if (analysisDataTypeSelect.value === 'volume_comparison_exercises') {
-                // Potentially trigger this if some exercises are pre-selected for comparison, or leave it to user.
-                // For now, user will need to select and generate.
-            }
-            showFeedback("Initial data loaded!");
-        };
-        clearRequest.onerror = (event) => {
-            console.error("Error clearing sessions for pre-fill:", event.target.error);
-            alert("Could not clear existing session data for pre-fill. Please check console.");
-        };
-        // Original count logic is bypassed for this specific "force prefill" request.
-        // To revert to "prefill only if empty", restore the countRequest logic here.
+            console.warn("DEVELOPMENT: Clearing all existing sessions before pre-fill as per current task requirement.");
+            const clearRequest = sessionStore.clear();
+
+            clearRequest.onsuccess = async () => {
+                console.log("All sessions cleared from DB. Proceeding with pre-fill.");
+                showFeedback("Setting up initial data (existing sessions cleared)...");
+                try {
+                    await populateWithProvidedData(); // This populates the DB
+                    showFeedback("Initial data populated into DB!");
+                    resolve(); // Resolve after populating DB
+                } catch (populateError) {
+                    console.error("Error during populateWithProvidedData:", populateError);
+                    reject(populateError);
+                }
+            };
+            clearRequest.onerror = (event) => {
+                console.error("Error clearing sessions for pre-fill:", event.target.error);
+                alert("Could not clear existing session data for pre-fill. Please check console.");
+                reject(event.target.error);
+            };
+        });
     }
 
     async function populateWithProvidedData() {
