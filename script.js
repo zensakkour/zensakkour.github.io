@@ -1562,30 +1562,32 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         return new Promise((resolve, reject) => {
-            // For this specific request, we always clear and prefill.
-            // For a production app, you'd check if prefill is needed (e.g., countRequest.result === 0)
             const transaction = db.transaction(['sessions'], 'readwrite');
             const sessionStore = transaction.objectStore('sessions');
+            const countRequest = sessionStore.count();
 
-            console.warn("DEVELOPMENT: Clearing all existing sessions before pre-fill as per current task requirement.");
-            const clearRequest = sessionStore.clear();
-
-            clearRequest.onsuccess = async () => {
-                console.log("All sessions cleared from DB. Proceeding with pre-fill.");
-                showFeedback("Setting up initial data (existing sessions cleared)...");
-                try {
-                    await populateWithProvidedData(); // This populates the DB
-                    showFeedback("Initial data populated into DB!");
-                    resolve(); // Resolve after populating DB
-                } catch (populateError) {
-                    console.error("Error during populateWithProvidedData:", populateError);
-                    reject(populateError);
+            countRequest.onsuccess = async () => {
+                if (countRequest.result === 0) {
+                    console.log("No sessions found in DB, attempting to pre-fill data...");
+                    showFeedback("Setting up initial sample data...");
+                    try {
+                        await populateWithProvidedData(); // This populates the DB
+                        showFeedback("Initial sample data loaded!");
+                        resolve(); // Resolve after populating DB
+                    } catch (populateError) {
+                        console.error("Error during populateWithProvidedData:", populateError);
+                        reject(populateError); // Propagate error
+                    }
+                } else {
+                    console.log("Sessions found in DB, skipping pre-fill.");
+                    resolve(); // Resolve, as no action is needed
                 }
             };
-            clearRequest.onerror = (event) => {
-                console.error("Error clearing sessions for pre-fill:", event.target.error);
-                alert("Could not clear existing session data for pre-fill. Please check console.");
-                reject(event.target.error);
+            countRequest.onerror = (event) => {
+                console.error("Error counting sessions for pre-fill:", event.target.error);
+                // Still resolve, as failure to count shouldn't break the app, just means prefill might not happen.
+                // Or reject if prefill is critical on first load. For now, let's be lenient.
+                resolve();
             };
         });
     }
