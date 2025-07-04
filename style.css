@@ -579,3 +579,11 @@ ul.styled-list { /* Remove default list styling if ul is used */
 #generate-volume-comparison-btn {
     margin-top: 10px;
 }
+
+.form-hint {
+    display: block;
+    font-size: 0.85em;
+    color: var(--text-muted);
+    margin-top: 5px;
+    margin-bottom: 10px; /* Add some space before button if hint is long */
+}

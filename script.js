@@ -46,12 +46,12 @@ document.addEventListener('DOMContentLoaded', () => {
     const analysisDataTypeSelect = document.getElementById('analysis-data-type-select');
     const exerciseSelectAnalysis = document.getElementById('exercise-select-analysis'); // Single exercise select
     const exerciseSelectLabelAnalysis = document.getElementById('exercise-select-label-analysis');
-    const exerciseSelectGroupAnalysis = document.getElementById('exercise-select-group-analysis'); // Div for single select
-    const multiExerciseSelectAnalysis = document.getElementById('multi-exercise-select-analysis'); // Multi-select for comparison
-    const multiExerciseSelectGroupAnalysis = document.getElementById('multi-exercise-select-group-analysis'); // Div for multi-select
+    const exerciseSelectGroupAnalysis = document.getElementById('exercise-select-group-analysis');
+    const multiExerciseSelectAnalysis = document.getElementById('multi-exercise-select-analysis');
+    const multiExerciseSelectGroupAnalysis = document.getElementById('multi-exercise-select-group-analysis');
     const generateVolumeComparisonBtn = document.getElementById('generate-volume-comparison-btn');
     const progressChartCanvas = document.getElementById('progressChart').getContext('2d');
-    const rawDataOutput = document.getElementById('raw-data-output');
+    // const rawDataOutput = document.getElementById('raw-data-output'); // Removed
     let progressChart = null;
 
     // Detailed Exercise View Elements
@@ -244,11 +244,11 @@ document.addEventListener('DOMContentLoaded', () => {
             progressChart.destroy();
         }
         document.getElementById('progress-chart-container').style.display = 'block';
-        document.getElementById('raw-data-container').style.display = 'block';
+        // document.getElementById('raw-data-container').style.display = 'block'; // Removed
 
 
         if (!gymData.bodyWeightLog || gymData.bodyWeightLog.length === 0) {
-            rawDataOutput.textContent = "No body weight data recorded yet.";
+            // rawDataOutput.textContent = "No body weight data recorded yet."; // Removed
             progressChart = new Chart(progressChartCanvas, {
                 type: 'line', data: { labels: [], datasets: []},
                 options: { responsive: true, maintainAspectRatio: false, plugins: { title: { display: true, text: 'Body Weight Progress - No Data', color: '#f4f4f4'}}}
@@ -261,7 +261,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const labels = sortedLog.map(entry => new Date(entry.date).toLocaleDateString());
         const weightData = sortedLog.map(entry => entry.weight);
 
-        rawDataOutput.textContent = JSON.stringify(sortedLog.map(e => ({date: e.date, weight: e.weight})), null, 2);
+        // rawDataOutput.textContent = JSON.stringify(sortedLog.map(e => ({date: e.date, weight: e.weight})), null, 2); // Removed
 
         progressChart = new Chart(progressChartCanvas, {
             type: 'line',
@@ -839,49 +839,60 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // --- Render Detailed Exercise View ---
     function renderDetailedExerciseView(exerciseName) {
-        currentViewingExerciseName = exerciseName; // Ensure this is set for 1RM context
+        currentViewingExerciseName = exerciseName;
         detailedExerciseNameEl.textContent = exerciseName;
         detailedExerciseHistoryListEl.innerHTML = '';
-        setFor1RMSelect.innerHTML = '<option value="">-- Choose a Set --</option>'; // Clear and add default
+        setFor1RMSelect.innerHTML = '<option value="">-- Choose a Set --</option>';
         calculated1RMResultEl.textContent = 'Estimated 1RM: -- kg';
 
-
-        const allSetsForExercise = [];
+        // 1. Find all instances of this exercise to identify the most recent performance AND to populate 1RM
+        const allPerformances = [];
         gymData.sessions.forEach(session => {
-            session.exercises.forEach(ex => {
-                if (ex.name === exerciseName) {
-                    ex.sets.forEach(set => {
-                        allSetsForExercise.push({
-                            ...set,
-                            sessionDate: session.date || new Date(session.id).toLocaleDateString(), // Fallback for older data
-                            sessionName: session.name
-                        });
+            const foundExercise = session.exercises.find(ex => ex.name === exerciseName);
+            if (foundExercise && foundExercise.sets.length > 0) {
+                // For each set in this performance, add session details
+                foundExercise.sets.forEach(set => {
+                    allPerformances.push({
+                        ...set, // Spread set properties (weight, reps, notes, timestamp, id)
+                        sessionDate: session.date,
+                        sessionName: session.name,
+                        sessionId: session.id, // Keep session Id for context if needed
+                        exerciseIdInSession: foundExercise.id // Specific ID of this exercise instance in this session
                     });
-                }
-            });
+                });
+            }
         });
 
-        // Sort by date, most recent first for history list
-        allSetsForExercise.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+        // Sort all performances by timestamp (most recent first) for both history display and 1RM select
+        allPerformances.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
 
-        if (allSetsForExercise.length === 0) {
-            detailedExerciseHistoryListEl.innerHTML = '<p class="empty-state-message">No history found for this exercise.</p>';
-        } else {
-            allSetsForExercise.forEach(set => {
+        // 2. Display "Previous Performance" (sets from the single most recent session)
+        if (allPerformances.length > 0) {
+            const mostRecentSessionId = allPerformances[0].sessionId;
+            const mostRecentSessionDate = allPerformances[0].sessionDate;
+            const mostRecentSessionName = allPerformances[0].sessionName;
+
+            const historyHeader = document.createElement('h5');
+            historyHeader.textContent = `Last Performed on: ${new Date(mostRecentSessionDate).toLocaleDateString()} (in session: ${mostRecentSessionName})`;
+            detailedExerciseHistoryListEl.appendChild(historyHeader);
+
+            // Filter sets that belong to this most recent session for this exercise
+            allPerformances.filter(set => set.sessionId === mostRecentSessionId).forEach((set, index) => {
                 const item = document.createElement('div');
                 item.className = 'set-item-historical';
-                const datePrefix = document.createElement('span');
-                datePrefix.className = 'date-prefix';
-                datePrefix.textContent = `${new Date(set.timestamp).toLocaleDateString()} (${set.sessionName}): `;
-                item.appendChild(datePrefix);
-                item.append(`${set.weight} kg x ${set.reps} reps`);
+                item.textContent = `Set ${index + 1}: ${set.weight} kg x ${set.reps} reps`;
                 if (set.note) item.append(` (${set.note})`);
                 detailedExerciseHistoryListEl.appendChild(item);
+            });
+        } else {
+            detailedExerciseHistoryListEl.innerHTML = '<p class="empty-state-message">No previous performance found for this exercise.</p>';
+        }
 
-                // Populate 1RM select dropdown
+        // 3. Populate 1RM select dropdown using ALL historical sets (most recent first)
+        if (allPerformances.length > 0) {
+            allPerformances.forEach(set => {
                 if (set.reps > 0 && set.weight > 0) { // Only include valid sets for 1RM
                     const option = document.createElement('option');
-                    // Store weight and reps in the option's value or dataset
                     option.value = JSON.stringify({ weight: set.weight, reps: set.reps });
                     option.textContent = `${new Date(set.timestamp).toLocaleDateString()} - ${set.weight}kg x ${set.reps}reps (${set.sessionName})`;
                     setFor1RMSelect.appendChild(option);
@@ -889,18 +900,15 @@ document.addEventListener('DOMContentLoaded', () => {
             });
         }
 
-        // Render mini-chart for this exercise (e.g., weight over time)
+        // 4. Render mini-chart using ALL historical sets (oldest first for chart)
         if (detailedExerciseChart) {
             detailedExerciseChart.destroy();
         }
-
-        // Sort by date, oldest first for chart
-        const chartDataPoints = allSetsForExercise.sort((a,b) => new Date(a.timestamp) - new Date(b.timestamp));
+        const chartDataPoints = [...allPerformances].filter(s => s.weight > 0).sort((a,b) => new Date(a.timestamp) - new Date(b.timestamp));
 
         if (chartDataPoints.length > 0) {
             const labels = chartDataPoints.map(s => new Date(s.timestamp).toLocaleDateString());
             const weightData = chartDataPoints.map(s => s.weight);
-            // Could add reps or volume data as well
 
             detailedExerciseChart = new Chart(detailedExerciseChartCanvas, {
                 type: 'line',
@@ -915,17 +923,13 @@ document.addEventListener('DOMContentLoaded', () => {
                         tension: 0.1
                     }]
                 },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
+                options: { // Keep existing chart options, ensure they are complete
+                    responsive: true, maintainAspectRatio: false,
                     scales: {
                         x: { ticks: { color: '#ccc' }, grid: { color: 'rgba(204,204,204,0.1)'} },
                         y: { ticks: { color: '#ccc' }, grid: { color: 'rgba(204,204,204,0.1)'}, title: { display: true, text: 'Weight (kg)', color: '#ccc'} }
                     },
-                    plugins: {
-                        legend: { labels: { color: '#ccc'} },
-                        title: { display: false } // Main title is already on the page
-                    }
+                    plugins: { legend: { labels: { color: '#ccc'} }, title: { display: false } }
                 }
             });
             document.getElementById('detailed-exercise-chart-container').style.display = 'block';
@@ -1189,7 +1193,7 @@ document.addEventListener('DOMContentLoaded', () => {
     function handleAnalysisTypeChange() {
         const selectedType = analysisDataTypeSelect.value;
         const progressChartContainer = document.getElementById('progress-chart-container');
-        const rawDataContainer = document.getElementById('raw-data-container');
+        // const rawDataContainer = document.getElementById('raw-data-container'); // Reference removed
 
         // Hide all specific controls by default, then show relevant ones
         exerciseSelectGroupAnalysis.style.display = 'none';
@@ -1199,19 +1203,24 @@ document.addEventListener('DOMContentLoaded', () => {
             exerciseSelectGroupAnalysis.style.display = 'inline-block';
             if(exerciseSelectAnalysis.value) {
                 progressChartContainer.style.display = 'block';
-                rawDataContainer.style.display = 'block';
+                // rawDataContainer.style.display = 'block'; // Removed
                 displayProgressForExercise(exerciseSelectAnalysis.value);
             } else {
                 progressChartContainer.style.display = 'none';
-                rawDataContainer.style.display = 'none';
+                // rawDataContainer.style.display = 'none'; // Removed
                 if (progressChart) progressChart.destroy();
-                rawDataOutput.textContent = "Select an exercise to see its progress.";
+                // rawDataOutput.textContent = "Select an exercise to see its progress."; // Removed
             }
         } else if (selectedType === 'bodyweight') {
-            exerciseSelectAnalysis.style.display = 'none';
-            exerciseSelectAnalysis.style.display = 'none';
-            exerciseSelectLabelAnalysis.style.display = 'none';
-            displayBodyWeightProgress(); // Call the actual function to render chart
+            // exerciseSelectGroupAnalysis is already hidden by default
+            // multiExerciseSelectGroupAnalysis is already hidden by default
+            displayBodyWeightProgress();
+        } else if (selectedType === 'volume_comparison_exercises') {
+            multiExerciseSelectGroupAnalysis.style.display = 'block';
+            populateMultiExerciseSelect();
+            if (progressChart) progressChart.destroy();
+            progressChartContainer.style.display = 'none';
+            // rawDataOutput.textContent = "Select exercises (Ctrl/Cmd + Click or Shift + Click) and click 'Generate Chart' to compare volumes."; // Removed
         }
     }
 
@@ -1257,12 +1266,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
         if (!exerciseName) {
             document.getElementById('progress-chart-container').style.display = 'none';
-            document.getElementById('raw-data-container').style.display = 'none';
+            // document.getElementById('raw-data-container').style.display = 'none'; // Removed
             return;
         }
 
         document.getElementById('progress-chart-container').style.display = 'block';
-        document.getElementById('raw-data-container').style.display = 'block';
+        // document.getElementById('raw-data-container').style.display = 'block'; // Removed
 
         const exerciseDataPoints = [];
         gymData.sessions.forEach(session => {
@@ -1317,19 +1326,19 @@ document.addEventListener('DOMContentLoaded', () => {
         exerciseDataPoints.sort((a, b) => a.timestamp - b.timestamp);
 
         if (exerciseDataPoints.length === 0) {
-            rawDataOutput.textContent = "No data recorded for this exercise yet.";
+            // rawDataOutput.textContent = "No data recorded for this exercise yet."; // Removed
             if (progressChart) progressChart.destroy();
              document.getElementById('progress-chart-container').style.display = 'none';
             return;
         }
 
-        rawDataOutput.textContent = JSON.stringify(exerciseDataPoints.map(dp => ({
-            date: dp.timestamp.toLocaleDateString(),
-            time: dp.timestamp.toLocaleTimeString(),
-            weight: dp.weight,
-            reps: dp.reps,
-            volume: dp.volume
-        })), null, 2);
+        // rawDataOutput.textContent = JSON.stringify(exerciseDataPoints.map(dp => ({ // Removed
+        //     date: dp.timestamp.toLocaleDateString(),
+        //     time: dp.timestamp.toLocaleTimeString(),
+        //     weight: dp.weight,
+        //     reps: dp.reps,
+        //     volume: dp.volume
+        // })), null, 2);
 
         const labels = exerciseDataPoints.map(dp => dp.timestamp.toLocaleDateString() + ' ' + dp.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
         const weightData = exerciseDataPoints.map(dp => dp.weight);
@@ -1364,16 +1373,16 @@ document.addEventListener('DOMContentLoaded', () => {
             progressChart.destroy();
         }
         if (!selectedExerciseNames || selectedExerciseNames.length === 0) {
-            rawDataOutput.textContent = "Please select at least one exercise to compare volumes.";
+            // rawDataOutput.textContent = "Please select at least one exercise to compare volumes."; // Removed
             document.getElementById('progress-chart-container').style.display = 'none';
             return;
         }
 
         document.getElementById('progress-chart-container').style.display = 'block';
-        rawDataOutput.textContent = ''; // Clear raw data or show relevant aggregated data
+        // rawDataOutput.textContent = ''; // Removed
 
         const datasets = [];
-        const allTimestamps = new Set(); // To create a common X-axis
+        const allTimestamps = new Set();
         const exerciseDataMap = new Map(); // Store aggregated volume per exercise per day
 
         // Aggregate volume per day for each selected exercise
@@ -1430,15 +1439,15 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
          // Optional: Display aggregated raw data for comparison
-        let rawComparisonData = "Daily Volume Data:\n";
-        sortedUniqueTimestamps.forEach(dateStr => {
-            rawComparisonData += `\nDate: ${dateStr}\n`;
-            selectedExerciseNames.forEach(exName => {
-                const dailyVolumes = exerciseDataMap.get(exName);
-                rawComparisonData += `  ${exName}: ${dailyVolumes.get(dateStr) || 0} kg*reps\n`;
-            });
-        });
-        rawDataOutput.textContent = rawComparisonData;
+        // let rawComparisonData = "Daily Volume Data:\n"; // Removed
+        // sortedUniqueTimestamps.forEach(dateStr => {
+        //     rawComparisonData += `\nDate: ${dateStr}\n`;
+        //     selectedExerciseNames.forEach(exName => {
+        //         const dailyVolumes = exerciseDataMap.get(exName);
+        //         rawComparisonData += `  ${exName}: ${dailyVolumes.get(dateStr) || 0} kg*reps\n`;
+        //     });
+        // });
+        // rawDataOutput.textContent = rawComparisonData; // Removed
     }
 
 
