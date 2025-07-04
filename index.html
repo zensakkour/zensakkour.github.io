@@ -34,9 +34,23 @@
         <ul>
             <li><a href="#sessions">Sessions</a></li>
             <li><a href="#analysis">Analysis</a></li>
+            <li><a href="#profile">Profile</a></li>
         </ul>
     </nav>
     <main>
+        <section id="profile" style="display: none;">
+            <h2>Your Profile</h2>
+            <div id="profile-details">
+                <div class="controls-group">
+                    <label for="profile-username">Username:</label>
+                    <input type="text" id="profile-username" placeholder="Enter your username (letters, numbers, _ only)">
+                </div>
+                <button id="save-profile-btn" class="button-primary">Save Username</button>
+            </div>
+            <div id="profile-feedback" style="margin-top:1em; padding: 10px; border-radius: 5px; display:none;"></div>
+             <!-- This div will be used for feedback messages directly within the profile section -->
+        </section>
+
         <section id="sessions">
             <h2>Sessions</h2>
             <div id="session-list">
