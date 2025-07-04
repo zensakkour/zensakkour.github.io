@@ -320,8 +320,14 @@ document.addEventListener('DOMContentLoaded', () => {
                 sessionItemContainer.className = 'list-item-container'; // For layout
 
                 button.addEventListener('click', (e) => {
-                    // Prevent delete button click from triggering session view
-                    if (e.target.classList.contains('delete-btn')) return;
+                    // More robust check: if the click originated on or within an element with class 'delete-btn'
+                    if (e.target.closest('.delete-btn')) {
+                        console.log("Click target is part of a delete button, preventing session entry.");
+                        return; // Do nothing, let the delete button's own handler manage it.
+                    }
+
+                    // If not a click on/in a delete button, proceed to enter the session
+                    console.log("Entering session:", session.name, session.id);
                     currentSessionId = session.id;
                     renderExercisesForSession(session.id);
                     showExerciseView();
@@ -807,10 +813,13 @@ document.addEventListener('DOMContentLoaded', () => {
     function showExerciseView() {
         sessionListDiv.style.display = 'none';
         sessionViewControls.style.display = 'none';
-        exerciseViewContainer.style.display = 'block';
-        detailedExerciseViewContainer.style.display = 'none';
-        setTrackerContainer.style.display = 'none';
-        currentExerciseId = null; // Reset specific exercise context when showing list
+        detailedExerciseViewContainer.style.display = 'none'; // Explicitly hide detailed view
+        setTrackerContainer.style.display = 'none';       // Explicitly hide set tracker
+        exerciseViewContainer.style.display = 'block';    // Show this view
+
+        // currentSessionId should already be set from when the session was clicked.
+        // Do NOT reset currentSessionId here.
+        currentExerciseId = null;
         currentViewingExerciseName = null;
     }
 
@@ -1013,25 +1022,28 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     addExerciseBtn.addEventListener('click', () => {
+        console.log("[Add Exercise Click] currentSessionId:", currentSessionId); // LOGGING
         if (currentSessionId === null) {
-            alert("Please select a session first.");
+            alert("Please select a session first. (currentSessionId is null)");
             return;
         }
         const exerciseName = newExerciseNameInput.value.trim();
         if (exerciseName) {
             const session = gymData.sessions.find(s => s.id === currentSessionId);
             if (session) {
+                console.log("[Add Exercise] Found session:", session.name); // LOGGING
                 const newExercise = {
                     id: Date.now(),
                     name: exerciseName,
                     sets: [],
-                    order: session.exercises.length // Assign next sort order
+                    order: session.exercises.length
                 };
                 session.exercises.push(newExercise);
                 dbPut('sessions', session)
                     .then(() => {
+                        console.log("[Add Exercise] Successfully saved to DB. Rendering exercises for session:", currentSessionId); // LOGGING
                         newExerciseNameInput.value = '';
-                        renderExercisesForSession(currentSessionId); // Will render with new order
+                        renderExercisesForSession(currentSessionId);
                         showFeedback("Exercise added!");
                     })
                     .catch(err => {
@@ -1039,6 +1051,9 @@ document.addEventListener('DOMContentLoaded', () => {
                         session.exercises.pop();
                         alert("Error saving exercise. Please try again.");
                     });
+            } else {
+                console.error("[Add Exercise] Session not found in gymData for ID:", currentSessionId); // LOGGING
+                 alert("Error: Could not find the current session data to add the exercise to.");
             }
         } else {
             alert("Please enter an exercise name.");
