@@ -109,8 +109,21 @@ document.addEventListener('DOMContentLoaded', () => {
             };
 
             request.onerror = (event) => {
-                console.error("IndexedDB error:", event.target.error);
-                reject(event.target.error);
+                const error = event.target.error;
+                console.error("IndexedDB initialization error:", error);
+                console.error("Error name:", error.name);
+                console.error("Error message:", error.message);
+                // Additional details that might be useful depending on the error type
+                if (error.name === "VersionError") {
+                    console.error("IndexedDB version error: This can happen if the database is opened with an older version after being upgraded, or if there's an issue with onupgradeneeded.");
+                } else if (error.name === "QuotaExceededError") {
+                    console.error("IndexedDB QuotaExceededError: The browser storage limit has been reached.");
+                } else if (error.name === "UnknownError") {
+                    console.error("IndexedDB UnknownError: An unspecified error occurred. This could be due to disk corruption or other low-level issues.");
+                }
+                // Consider if you want to show a more user-friendly message here or rely on the global catch.
+                // For now, enhancing console logging is the primary goal of this step.
+                reject(error); // Pass the full error object
             };
         });
     }
@@ -121,10 +134,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
     async function loadData() {
         if (!db) {
-            // This should ideally not happen if loadData is called correctly after initDB.
-            console.error("DB not initialized when loadData was called. This indicates an issue in the calling sequence.");
-            gymData = { sessions: [], bodyWeightLog: [] }; // Fallback to empty
-            return Promise.reject(new Error("Database not initialized for loadData.")); // Reject promise
+            const errorMessage = "Database not initialized when loadData was called. Ensure initDB() completes successfully before loading data.";
+            console.error(errorMessage);
+            // gymData should not be modified here if we're rejecting; let the caller handle the state.
+            return Promise.reject(new Error(errorMessage));
         }
 
         const transaction = db.transaction(['sessions', 'bodyWeightLog'], 'readonly');
@@ -1525,10 +1538,56 @@ document.addEventListener('DOMContentLoaded', () => {
             displayProgressForExercise("");
         })
         .catch(error => {
-            console.error("Failed to initialize DB or load/prefill data:", error);
-            alert("Application could not start correctly. Please try refreshing. If the problem persists, your browser might not support IndexedDB or is in private mode.");
-            gymData = { sessions: [], bodyWeightLog: [] }; // Fallback
-            renderSessions(); // Attempt to render with empty data
+            console.error("Critical application initialization failure:", error);
+            let userMessage = "Application could not start correctly. Please try refreshing.";
+
+            if (error && error.message) {
+                userMessage += `\n\nDetails: ${error.message}`;
+            }
+
+            if (error && error.name) {
+                userMessage += ` (Error type: ${error.name})`;
+                if (error.name === "QuotaExceededError") {
+                    userMessage += "\n\nThis might be due to insufficient storage space in your browser. Try clearing some browser data or increasing storage quotas if possible.";
+                } else if (error.name === "VersionError") {
+                    userMessage += "\n\nThere was an issue with the database version. If you are a developer, check the console for `onupgradeneeded` errors. Otherwise, clearing site data might help.";
+                }
+            }
+
+            if (navigator.storage && typeof navigator.storage.estimate === 'function') {
+                navigator.storage.estimate().then(estimate => {
+                    userMessage += `\n\nAvailable storage: ${(estimate.quota / (1024*1024)).toFixed(2)}MB. Used: ${(estimate.usage / (1024*1024)).toFixed(2)}MB.`;
+                    alert(userMessage + "\n\nIf the problem persists, your browser might not support IndexedDB, is in private mode, or has run out of storage.");
+                }).catch(() => {
+                    alert(userMessage + "\n\nIf the problem persists, your browser might not support IndexedDB, is in private mode, or has run out of storage. (Could not retrieve storage estimate)");
+                });
+            } else {
+                alert(userMessage + "\n\nIf the problem persists, your browser might not support IndexedDB, is in private mode, or has run out of storage.");
+            }
+
+            // Fallback: try to render a minimal UI or provide clear instructions
+            gymData = { sessions: [], bodyWeightLog: [] }; // Initialize to empty
+            try {
+                // Attempt to render basic structure even if data loading failed,
+                // so the page isn't entirely blank.
+                showSessionListView(); // Show the default view
+                renderSessions();      // Render empty sessions list
+                // Potentially disable input fields or show a persistent error message on the page
+                const mainContent = document.querySelector('main');
+                if (mainContent) {
+                    const errorDiv = document.createElement('div');
+                    errorDiv.style.color = 'red';
+                    errorDiv.style.padding = '20px';
+                    errorDiv.style.border = '1px solid red';
+                    errorDiv.style.textAlign = 'center';
+                    errorDiv.textContent = "Application failed to load critical data. Some features may be unavailable. Please check the browser console for details and try refreshing or clearing site data.";
+                    mainContent.prepend(errorDiv);
+                }
+
+            } catch (renderError) {
+                console.error("Error attempting to render fallback UI:", renderError);
+                // If even rendering the fallback fails, there's not much more to do in JS.
+            }
         });
 
     // --- Data Pre-fill ---
@@ -1664,7 +1723,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 await dbPut('sessions', newSession);
                 console.log(`Successfully put session to DB: ${newSession.name} for date ${newSession.date}`);
             } catch (err) {
-                console.error(`Error prefilling session ${newSession.name}:`, err);
+            console.error(`Error prefilling session ${newSession.name} (ID: ${newSession.id}):`, err);
+            // Re-throw the error to be caught by the caller (prefillDataIfEmpty)
+            // This ensures that a failure in pre-filling any part of the data will cause the
+            // overall pre-fill operation to fail and be reported.
+            throw new Error(`Failed to prefill session data for '${newSession.name}': ${err.message || err}`);
             }
         }
     }
