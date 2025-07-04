@@ -16,8 +16,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const bodyWeightHistoryDiv = document.getElementById('body-weight-history');
 
     // DOM Elements
-    const sessionListDiv = document.getElementById('session-list');
-    const sessionListDiv = document.getElementById('session-list');
+    const sessionListDiv = document.getElementById('session-list'); // Corrected: Removed duplicate declaration
     const newSessionNameInput = document.getElementById('new-session-name');
     const addSessionBtn = document.getElementById('add-session-btn');
 
@@ -993,8 +992,9 @@ document.addEventListener('DOMContentLoaded', () => {
             const newSession = {
                 id: Date.now(),
                 name: sessionName,
+                date: new Date().toISOString().split('T')[0], // Add current date by default
                 exercises: [],
-                sortOrder: gymData.sessions.length // Assign next available sort order
+                sortOrder: gymData.sessions.length
             };
             dbPut('sessions', newSession)
                 .then(() => {
@@ -1542,105 +1542,118 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         const transaction = db.transaction(['sessions'], 'readonly');
         const sessionStore = transaction.objectStore('sessions');
-        const countRequest = sessionStore.count();
 
-        countRequest.onsuccess = async () => {
-            if (countRequest.result === 0) {
-                console.log("No sessions found in DB, attempting to pre-fill data...");
-                showFeedback("Setting up initial data...");
-                await populateWithProvidedData();
-                // After pre-filling, reload data into gymData and re-render
-                await loadData(); // Reload gymData from DB
-                renderSessions(); // Re-render UI
-                renderBodyWeightHistory();
-                populateExerciseSelect();
-                handleAnalysisTypeChange();
-                showFeedback("Initial data loaded!");
-            } else {
-                console.log("Sessions found in DB, skipping pre-fill.");
+        // Clear existing sessions first for this specific request
+        console.warn("DEVELOPMENT: Clearing all existing sessions before pre-fill as per current task requirement.");
+        const clearRequest = sessionStore.clear();
+
+        clearRequest.onsuccess = async () => {
+            console.log("All sessions cleared from DB. Proceeding with pre-fill.");
+            showFeedback("Setting up initial data (existing sessions cleared)...");
+            await populateWithProvidedData();
+            // After pre-filling, reload data into gymData and re-render
+            await loadData(); // Reload gymData from DB
+            renderSessions(); // Re-render UI
+            renderBodyWeightHistory();
+            populateExerciseSelect();
+            handleAnalysisTypeChange(); // Ensure correct analysis view
+            if (analysisDataTypeSelect.value === 'exercise' && exerciseSelectAnalysis.value) {
+                 displayProgressForExercise(exerciseSelectAnalysis.value);
+            } else if (analysisDataTypeSelect.value === 'bodyweight') {
+                displayBodyWeightProgress();
+            } else if (analysisDataTypeSelect.value === 'volume_comparison_exercises') {
+                // Potentially trigger this if some exercises are pre-selected for comparison, or leave it to user.
+                // For now, user will need to select and generate.
             }
+            showFeedback("Initial data loaded!");
         };
-        countRequest.onerror = (event) => {
-            console.error("Error counting sessions for pre-fill:", event.target.error);
+        clearRequest.onerror = (event) => {
+            console.error("Error clearing sessions for pre-fill:", event.target.error);
+            alert("Could not clear existing session data for pre-fill. Please check console.");
         };
+        // Original count logic is bypassed for this specific "force prefill" request.
+        // To revert to "prefill only if empty", restore the countRequest logic here.
     }
 
     async function populateWithProvidedData() {
-        const providedData = [
-            // PUSH DAY
+        console.log("Populating with provided data...");
+        const providedSessionData = [
+            // PUSH DAY - Date: 03/07/2025 (YYYY-MM-DD: 2025-07-03)
             {
                 sessionName: "Push Day (Chest / Forearms / Triceps)",
+                date: "2025-07-03",
                 exercises: [
                     { name: "Bench Press", sets: [{ weight: 70, reps: 7 }, { weight: 60, reps: 10 }, { weight: 60, reps: 6 }, { weight: 60, reps: 4 }] },
                     { name: "Barbell Overhead Press", sets: [{ weight: 30, reps: 10 }, { weight: 30, reps: 8 }, { weight: 30, reps: 9 }] },
                     { name: "Overhead Triceps Extension (Cable)", sets: [{ weight: 27, reps: 10 }, { weight: 27, reps: 10 }, { weight: 27, reps: 10 }] },
-                    { name: "Triceps Cable Push (Horizontal Bar)", sets: [{ weight: 50, reps: 9 }, { weight: 50, reps: 6 }, { weight: 45, reps: 0, note: "Drop Set to 36kg" }] }, // Representing drop set as one entry for now
+                    { name: "Triceps Cable Push (Horizontal Bar)", sets: [{ weight: 50, reps: 9 }, { weight: 50, reps: 6 }, { weight: 45, reps: 0, note: "Drop Set to 36kg" }] },
                     { name: "Cable Chest Flies", sets: [{ weight: 14, reps: 16 }, { weight: 18, reps: 10 }, { weight: 14, reps: 16 }, { weight: 18, reps: 7, note: "Drop Set" }] }
                 ]
             },
-            // PULL DAY
+            // PULL DAY - Assign a recent date (e.g., 2025-07-02)
             {
                 sessionName: "Pull Day (Back / Biceps / Core)",
+                date: "2025-07-02",
                 exercises: [
                     { name: "Deadlift", sets: [{ weight: 90, reps: 5 }, { weight: 90, reps: 8 }, { weight: 90, reps: 7 }, { weight: 80, reps: 6 }] },
                     { name: "Back-Middle Bar Row", sets: [{ weight: 50, reps: 12 }, { weight: 50, reps: 14 }, { weight: 50, reps: 8 }] },
                     { name: "Barbell Biceps Curl", sets: [{ weight: 30, reps: 5 }, { weight: 20, reps: 5 }, { weight: 20, reps: 11 }, { weight: 20, reps: 13 }, { weight: 20, reps: 6 }] },
-                    { name: "Hammer Curl (Cable)", sets: [{ weight: 27, reps: 13 }, { weight: 27, reps: 8 }, { weight: 27, reps: 14 }], note: "Flexible Cable" },
-                    { name: "Hammer Curl (Dumbells)", sets: [{ weight: 10, reps: 11 }, { weight: 10, reps: 9 }, { weight: 10, reps: 8 }], note: "Dumbells" },
+                    { name: "Hammer Curl (Cable)", sets: [{ weight: 27, reps: 13 }, { weight: 27, reps: 8 }, { weight: 27, reps: 14 }], note: "Flexible Cable" }, // Note at exercise level
+                    { name: "Hammer Curl (Dumbells)", sets: [{ weight: 10, reps: 11 }, { weight: 10, reps: 9 }, { weight: 10, reps: 8 }], note: "Dumbells" }, // Note at exercise level
                     { name: "Abs Cable Machine", sets: [{ weight: 41, reps: 20 }, { weight: 59, reps: 9 }, { weight: 59, reps: 19 }, { weight: 64, reps: 16 }] }
                 ]
             },
-            // LEG DAY
+            // LEG DAY - Assign a recent date (e.g., 2025-07-01)
             {
                 sessionName: "Leg Day (Quads / Shoulders / Calves)",
+                date: "2025-07-01",
                 exercises: [
-                    { name: "Squat", sets: [] }, // Assuming kg x means no actual data yet
+                    { name: "Squat", sets: [] }, // kg x means 0 reps or no data yet
                     { name: "Calf Raise", sets: [], note: "Standing/Seated" },
-                    { name: "Barbell Overhead Press", sets: [{ weight: 30, reps: 10 }, { weight: 30, reps: 8 }, { weight: 30, reps: 9 }] }, // Duplicate exercise name, will be treated as same for analysis unless differentiated
+                    { name: "Barbell Overhead Press", sets: [{ weight: 30, reps: 10 }, { weight: 30, reps: 8 }, { weight: 30, reps: 9 }] },
                     { name: "Shoulder Lateral Raise", sets: [{ weight: 8, reps: 14 }, { weight: 8, reps: 12 }, { weight: 8, reps: 7 }, { weight: 6, reps: 8, note: "Drop Set" }], note: "Dumbells" }
                 ]
             },
-            // STRENGTH DAY
+            // STRENGTH DAY - Assign a recent date (e.g., 2025-06-30)
             {
                 sessionName: "Strength Day",
+                date: "2025-06-30",
                 exercises: [
-                    { name: "Russian Seesaw", sets: [{ weight: 20, reps: 0 }, { weight: 20, reps: 0 }, { weight: 20, reps: 0 }, { weight: 20, reps: 0 }] }, // Assuming 'x' means reps not specified or 0
+                    { name: "Russian Seesaw", sets: [{ weight: 20, reps: 0 }, { weight: 20, reps: 0 }, { weight: 20, reps: 0 }, { weight: 20, reps: 0 }] }, // kg x means 0 reps
                     { name: "Deadlift", sets: [{ weight: 90, reps: 5 }, { weight: 90, reps: 8 }, { weight: 90, reps: 7 }, { weight: 80, reps: 6 }] },
                     { name: "Bench Press", sets: [{ weight: 70, reps: 7 }, { weight: 60, reps: 10 }, { weight: 60, reps: 6 }, { weight: 60, reps: 4 }] },
                     { name: "Barbell Biceps Curl", sets: [{ weight: 30, reps: 5 }, { weight: 20, reps: 5 }, { weight: 20, reps: 11 }, { weight: 20, reps: 13 }, { weight: 20, reps: 6 }] },
-                    { name: "Forearm Curls (In)", sets: [{ weight: 30, reps: 0 }, { weight: 30, reps: 0 }, { weight: 30, reps: 0 }] },
-                    { name: "Forearm Curls (Out)", sets: [{ weight: 30, reps: 0 }, { weight: 30, reps: 0 }, { weight: 30, reps: 0 }] }
+                    { name: "Forearm Curls (In)", sets: [{ weight: 30, reps: 0 }, { weight: 30, reps: 0 }, { weight: 30, reps: 0 }] }, // kg x means 0 reps
+                    { name: "Forearm Curls (Out)", sets: [{ weight: 30, reps: 0 }, { weight: 30, reps: 0 }, { weight: 30, reps: 0 }] } // kg x means 0 reps
                 ]
             }
         ];
 
-        const today = new Date(); // Use a consistent date for all pre-filled data if not specified
-        let dateOffset = 0; // To slightly differentiate session dates for charting
-
-        for (const sessionData of providedData) {
-            const sessionDate = new Date(today);
-            sessionDate.setDate(today.getDate() - dateOffset++); // Make each session a day earlier
+        for (const [index, sessionData] of providedSessionData.entries()) {
+            const sessionTimestamp = new Date(sessionData.date).toISOString(); // Use provided date for timestamp
 
             const newSession = {
-                id: Date.now() + Math.random(), // Ensure unique ID
+                id: Date.now() + index, // More robust unique ID generation
                 name: sessionData.sessionName,
-                date: sessionDate.toISOString().split('T')[0], // Store date as YYYY-MM-DD
-                exercises: sessionData.exercises.map(exData => ({
-                    id: Date.now() + Math.random(),
+                date: sessionData.date, // YYYY-MM-DD format
+                sortOrder: index, // Assign sort order based on array position
+                exercises: sessionData.exercises.map((exData, exIndex) => ({
+                    id: Date.now() + index + 1000 + exIndex, // More robust unique ID
                     name: exData.name,
                     note: exData.note || "",
-                    sets: exData.sets.map(setData => ({
-                        id: Date.now() + Math.random(),
-                        weight: setData.weight,
-                        reps: setData.reps,
-                        timestamp: sessionDate.toISOString(), // Use session date as timestamp for simplicity
+                    order: exIndex, // Assign order for exercises within session
+                    sets: exData.sets.map((setData, setIndex) => ({
+                        id: Date.now() + index + 2000 + exIndex + setIndex, // More robust unique ID
+                        weight: setData.weight || 0, // Default to 0 if not specified
+                        reps: setData.reps || 0,     // Default to 0 if not specified
+                        timestamp: sessionTimestamp, // Use session's date as timestamp for all its sets
                         note: setData.note || ""
                     }))
                 }))
             };
             try {
                 await dbPut('sessions', newSession);
-                console.log(`Prefilled session: ${newSession.name}`);
+                console.log(`Prefilled session: ${newSession.name} for date ${newSession.date}`);
             } catch (err) {
                 console.error(`Error prefilling session ${newSession.name}:`, err);
             }
