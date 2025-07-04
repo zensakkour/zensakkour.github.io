@@ -4,9 +4,10 @@ document.addEventListener('DOMContentLoaded', () => {
     // Supabase Client Initialization
     const SUPABASE_URL = 'https://cdbbaurycauyhlymmaec.supabase.co';
     const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNkYmJhdXJ5Y2F1eWhseW1tYWVjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTE2Mzc3NTcsImV4cCI6MjA2NzIxMzc1N30.gSMNIDm41JT6Ze79qawcqjIAn8Y4QsnwoXXRgzpv62s';
-    const supabase = supabaseJs.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    // Corrected: The global object from Supabase v2 CDN is 'supabase', not 'supabaseJs'
+    const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-    console.log("Supabase client initialized:", supabase);
+    console.log("Supabase client initialized:", supabaseClient);
 
     // Data store
     let gymData = {
@@ -93,7 +94,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         try {
             // Fetch sessions with nested exercises and sets
-            const { data: sessionsData, error: sessionsError } = await supabase
+            const { data: sessionsData, error: sessionsError } = await supabaseClient
                 .from('sessions')
                 .select(`
                     id,
@@ -138,7 +139,7 @@ document.addEventListener('DOMContentLoaded', () => {
             gymData.sessions = sessionsData || [];
 
             // Fetch body weight logs
-            const { data: bodyWeightData, error: bodyWeightError } = await supabase
+            const { data: bodyWeightData, error: bodyWeightError } = await supabaseClient
                 .from('body_weight_log')
                 .select('*')
                 .eq('user_id', currentUser.id)
@@ -342,7 +343,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }));
 
         try {
-            const { error } = await supabase.from('sessions').upsert(updates, { onConflict: 'id' });
+            const { error } = await supabaseClient.from('sessions').upsert(updates, { onConflict: 'id' });
             if (error) throw error;
             console.log("Sessions reordered and saved to Supabase.");
             renderSessions(); // Re-render from updated gymData
@@ -487,7 +488,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }));
 
         try {
-            const { error } = await supabase.from('exercises').upsert(updates, { onConflict: 'id' });
+            const { error } = await supabaseClient.from('exercises').upsert(updates, { onConflict: 'id' });
             if (error) throw error;
             console.log("Exercises reordered within session and saved to Supabase.");
             renderExercisesForSession(sessionDbId);
@@ -584,7 +585,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (confirm("Are you sure you want to delete this session and all its data? This action cannot be undone.")) {
             showFeedback("Deleting session...", false);
             try {
-                const { error } = await supabase.from('sessions').delete().eq('id', sessionIdToDelete).eq('user_id', currentUser.id);
+                const { error } = await supabaseClient.from('sessions').delete().eq('id', sessionIdToDelete).eq('user_id', currentUser.id);
                 if (error) throw error;
                 gymData.sessions = gymData.sessions.filter(session => session.id !== sessionIdToDelete);
                 renderSessions();
@@ -605,7 +606,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (confirm("Are you sure you want to delete this exercise and its sets? This action cannot be undone.")) {
             showFeedback("Deleting exercise...", false);
             try {
-                const { error } = await supabase.from('exercises').delete().eq('id', exerciseIdToDelete).eq('user_id', currentUser.id);
+                const { error } = await supabaseClient.from('exercises').delete().eq('id', exerciseIdToDelete).eq('user_id', currentUser.id);
                 if (error) throw error;
 
                 const session = gymData.sessions.find(s => s.id === sessionIdOfExercise);
@@ -629,7 +630,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!currentUser) { showFeedback("You must be logged in.", true); return; }
         showFeedback("Deleting set...", false);
         try {
-            const { error } = await supabase.from('sets').delete().eq('id', setIdToDelete).eq('user_id', currentUser.id);
+            const { error } = await supabaseClient.from('sets').delete().eq('id', setIdToDelete).eq('user_id', currentUser.id);
             if (error) throw error;
 
             const session = gymData.sessions.find(s => s.id === sessionIdForSet);
@@ -658,7 +659,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (confirm("Are you sure you want to delete this body weight entry?")) {
             showFeedback("Deleting body weight entry...", false);
             try {
-                const { error } = await supabase.from('body_weight_log').delete().eq('id', entryIdToDelete).eq('user_id', currentUser.id);
+                const { error } = await supabaseClient.from('body_weight_log').delete().eq('id', entryIdToDelete).eq('user_id', currentUser.id);
                 if (error) throw error;
                 gymData.bodyWeightLog = gymData.bodyWeightLog.filter(entry => entry.id !== entryIdToDelete);
                 renderBodyWeightHistory();
@@ -793,7 +794,7 @@ document.addEventListener('DOMContentLoaded', () => {
             };
             showFeedback("Adding session...", false);
             try {
-                const { data, error } = await supabase.from('sessions').insert(newSessionData).select().single();
+                const { data, error } = await supabaseClient.from('sessions').insert(newSessionData).select().single();
                 if (error) throw error;
                 const newSessionWithExercises = {...data, exercises: []}; // Add empty exercises array for local gymData consistency
                 gymData.sessions.push(newSessionWithExercises);
@@ -825,7 +826,7 @@ document.addEventListener('DOMContentLoaded', () => {
             };
             showFeedback("Adding exercise...", false);
             try {
-                const { data, error } = await supabase.from('exercises').insert(newExerciseData).select().single();
+                const { data, error } = await supabaseClient.from('exercises').insert(newExerciseData).select().single();
                 if (error) throw error;
 
                 if (!session.exercises) session.exercises = [];
@@ -866,7 +867,7 @@ document.addEventListener('DOMContentLoaded', () => {
         };
         showFeedback("Adding set...", false);
         try {
-            const { data, error } = await supabase.from('sets').insert(newSetData).select().single();
+            const { data, error } = await supabaseClient.from('sets').insert(newSetData).select().single();
             if (error) throw error;
 
             const session = gymData.sessions.find(s => s.id === currentSessionId);
@@ -909,7 +910,7 @@ document.addEventListener('DOMContentLoaded', () => {
         };
         showFeedback("Logging body weight...", false);
         try {
-            const { data, error } = await supabase.from('body_weight_log').insert(newLogEntryData).select().single();
+            const { data, error } = await supabaseClient.from('body_weight_log').insert(newLogEntryData).select().single();
             if (error) throw error;
             gymData.bodyWeightLog.push(data);
             renderBodyWeightHistory(); // Re-render with new entry
@@ -1182,7 +1183,7 @@ document.addEventListener('DOMContentLoaded', () => {
         // displayProgressForExercise(""); // Clear analysis chart initially
     }
 
-    supabase.auth.onAuthStateChange(async (event, session) => {
+    supabaseClient.auth.onAuthStateChange(async (event, session) => {
         console.log('Auth event:', event, 'Session:', session);
         updateUIForAuthState(session ? session.user : null);
     });
@@ -1208,7 +1209,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const password = document.getElementById('signup-password').value;
         showFeedback("Signing up...", false);
         try {
-            const { data, error } = await supabase.auth.signUp({ email, password });
+            const { data, error } = await supabaseClient.auth.signUp({ email, password });
             if (error) throw error;
             showFeedback(`Signup successful! Welcome ${data.user.email}.`, false);
             // onAuthStateChange will handle UI, or if email confirmation is on, they'll need to confirm.
@@ -1229,7 +1230,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const password = document.getElementById('login-password').value;
         showFeedback("Logging in...", false);
         try {
-            const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+            const { data, error } = await supabaseClient.auth.signInWithPassword({ email, password });
             if (error) throw error;
             // onAuthStateChange will handle UI update via initializeAppData
             showFeedback(`Login successful! Welcome back.`, false);
@@ -1244,7 +1245,7 @@ document.addEventListener('DOMContentLoaded', () => {
     logoutBtn.addEventListener('click', async () => {
         showFeedback("Logging out...", false);
         try {
-            const { error } = await supabase.auth.signOut();
+            const { error } = await supabaseClient.auth.signOut();
             if (error) throw error;
             // onAuthStateChange will handle UI update
             showFeedback("Logout successful.", false);
