@@ -325,33 +325,7 @@ function findLastPerformedSetDetails(exerciseName) {
     return allSetsForThisExerciseName[0];
 }
 
-// --- Helper for Chart Data Aggregation (Moved from script.js) ---
-// Might move to a utils.js later if used elsewhere
-function calculateDailyVolume(setsArray) {
-    if (!setsArray || setsArray.length === 0) {
-        return [];
-    }
-    const dailyData = {};
-    setsArray.forEach(set => {
-        const setTimestamp = set.timestamp instanceof Date ? set.timestamp : new Date(set.timestamp);
-        if (isNaN(setTimestamp.getTime())) return;
-
-        const dateKey = `${setTimestamp.getFullYear()}-${(setTimestamp.getMonth() + 1).toString().padStart(2, '0')}-${setTimestamp.getDate().toString().padStart(2, '0')}`;
-        const volume = (parseFloat(set.weight) || 0) * (parseInt(set.reps) || 0);
-
-        if (!dailyData[dateKey]) {
-            dailyData[dateKey] = {
-                date: dateKey,
-                displayDate: setTimestamp.toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: '2-digit' }),
-                totalVolume: 0,
-            };
-        }
-        dailyData[dateKey].totalVolume += volume;
-    });
-    const aggregatedArray = Object.values(dailyData);
-    aggregatedArray.sort((a, b) => new Date(a.date) - new Date(b.date));
-    return aggregatedArray;
-}
+import { calculateDailyVolume } from '../utils.js'; // Import from new utils file
 
 
 export function renderDetailedExerciseView(exerciseName) {

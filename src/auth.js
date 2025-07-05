@@ -10,15 +10,10 @@ import {
     renderSetsForExercise
 } from './ui/exerciseView.js'; // Import actual exercise/set render functions
 import { renderBodyWeightHistory } from './ui/bodyWeightView.js'; // Import actual
-// import { populateExerciseSelect, handleAnalysisTypeChange } from './ui/analysisView.js'; // Future imports
+import { populateExerciseSelect, handleAnalysisTypeChange } from './ui/analysisView.js'; // Import actual
+import { updateUsernameAPI } from '../api.js'; // Import for profile username update
 
-
-// Placeholder for render functions that are not yet moved
-const placeholderRenderer = {
-    // renderSessions, renderExercisesForSession, renderDetailedExerciseView, renderSetsForExercise, renderBodyWeightHistory are now imported
-    populateExerciseSelect: () => console.warn("populateExerciseSelect not yet implemented"),
-    handleAnalysisTypeChange: () => console.warn("handleAnalysisTypeChange not yet implemented"),
-};
+// placeholderRenderer is no longer needed as all its functions are directly imported and used.
 
 
 async function initializeAppData() {
@@ -111,10 +106,10 @@ async function initializeAppData() {
         viewManager.showSessionListView(); // Use actual viewManager function
     }
 
-    placeholderRenderer.renderBodyWeightHistory();
+    renderBodyWeightHistory(); // Already using actual
     if (dom.bodyWeightDateInput) dom.bodyWeightDateInput.valueAsDate = new Date();
-    placeholderRenderer.populateExerciseSelect();
-    placeholderRenderer.handleAnalysisTypeChange();
+    populateExerciseSelect(); // Use actual
+    handleAnalysisTypeChange(); // Use actual
 
     // Update active nav link (will be part of viewManager)
     document.querySelectorAll('nav ul li a').forEach(nl => nl.classList.remove('active'));
@@ -279,4 +274,121 @@ export function initializeAuth() {
 
     // Initial UI state for auth forms (no user)
     updateUIForAuthState(null); // Ensures correct initial display of login/signup forms
+}
+
+
+export function setupProfileEventListeners() {
+    if (dom.saveProfileBtn) {
+        dom.saveProfileBtn.addEventListener('click', async () => {
+            if (!state.currentUser) {
+                showFeedback("You must be logged in to save your profile.", true, dom.profileFeedbackDiv);
+                return;
+            }
+            const newUsername = dom.profileUsernameInput.value.trim();
+            if (!newUsername) {
+                showFeedback("Username cannot be empty.", true, dom.profileFeedbackDiv);
+                return;
+            }
+            // Optional: Add more sophisticated validation for username (e.g., regex)
+            // if (!/^[a-zA-Z0-9_]{3,}$/.test(newUsername)) { ... }
+
+            showFeedback("Saving username...", false, dom.profileFeedbackDiv);
+            try {
+                // The updateUsernameAPI function was added to api.js
+                const updatedProfile = await updateUsernameAPI(state.currentUser.id, newUsername);
+
+                if (updatedProfile) {
+                    // Update local currentUser state
+                    state.setCurrentUser({ ...state.currentUser, username: updatedProfile.username });
+                    if (state.currentUser.username) { // Update display in header
+                        dom.userEmailSpan.textContent = state.currentUser.username;
+                    } else {
+                        dom.userEmailSpan.textContent = state.currentUser.email;
+                    }
+                    showFeedback("Username saved successfully!", false, dom.profileFeedbackDiv);
+                } else {
+                    showFeedback("Profile not found or no changes made.", true, dom.profileFeedbackDiv);
+                }
+            } catch (error) {
+                console.error("Error saving username:", error);
+                showFeedback(`Error saving username: ${error.message}`, true, dom.profileFeedbackDiv);
+            }
+        });
+    }
+
+    if (dom.changePasswordBtn) {
+        dom.changePasswordBtn.addEventListener('click', async () => {
+            const newPassword = dom.newPasswordInput.value;
+            const confirmPassword = dom.confirmPasswordInput.value;
+            if(dom.passwordFeedbackDiv) dom.passwordFeedbackDiv.style.display = 'none';
+
+            if (!newPassword || !confirmPassword) {
+                showFeedback("Please fill in both password fields.", true, dom.passwordFeedbackDiv);
+                return;
+            }
+            if (newPassword.length < 6) { // Supabase default min length
+                showFeedback("New password must be at least 6 characters long.", true, dom.passwordFeedbackDiv);
+                return;
+            }
+            if (newPassword !== confirmPassword) {
+                showFeedback("New passwords do not match.", true, dom.passwordFeedbackDiv);
+                return;
+            }
+
+            showFeedback("Changing password...", false, dom.passwordFeedbackDiv);
+            try {
+                const { error } = await supabaseClient.auth.updateUser({ password: newPassword });
+                if (error) throw error;
+                showFeedback("Password updated successfully!", false, dom.passwordFeedbackDiv);
+                dom.newPasswordInput.value = '';
+                dom.confirmPasswordInput.value = '';
+            } catch (error) {
+                console.error("Error changing password:", error);
+                showFeedback(`Error changing password: ${error.message}`, true, dom.passwordFeedbackDiv);
+            }
+        });
+    }
+
+    if (dom.changeEmailBtn) {
+        dom.changeEmailBtn.addEventListener('click', async () => {
+            const newEmail = dom.newEmailInput.value.trim();
+            if(dom.emailFeedbackDiv) dom.emailFeedbackDiv.style.display = 'none';
+
+            if (!newEmail) {
+                showFeedback("Please enter the new email address.", true, dom.emailFeedbackDiv);
+                return;
+            }
+            const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+            if (!emailPattern.test(newEmail)) {
+                showFeedback("Please enter a valid email address.", true, dom.emailFeedbackDiv);
+                return;
+            }
+            if (state.currentUser && newEmail === state.currentUser.email) {
+                showFeedback("The new email address is the same as your current one.", true, dom.emailFeedbackDiv);
+                return;
+            }
+
+            showFeedback("Requesting email change...", false, dom.emailFeedbackDiv);
+            try {
+                // Note: Supabase sends confirmation emails for email changes.
+                // The user needs to confirm via both old and new email addresses.
+                const { data, error } = await supabaseClient.auth.updateUser({ email: newEmail });
+                if (error) throw error;
+
+                showFeedback(
+                    "Email change request initiated. Please check your OLD email address to confirm this change, " +
+                    "and then check your NEW email address to verify it. Your email will update after verification.",
+                    false,
+                    dom.emailFeedbackDiv
+                );
+                dom.newEmailInput.value = '';
+            } catch (error) {
+                console.error("Error requesting email change:", error);
+                showFeedback(`Error: ${error.message}`, true, dom.emailFeedbackDiv);
+            }
+        });
+    }
+
+    // Populate username when profile tab is focused/shown (handled by viewManager's nav listener)
+    // This function is primarily for button event listeners.
 }

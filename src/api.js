@@ -262,5 +262,31 @@ export async function updateBodyWeightLogDateAPI(entryId, newDate) {
     if (error) throw error;
 }
 
-// --- Profile API Functions (Placeholders) ---
-// ...
+// --- Profile API Functions ---
+export async function updateUsernameAPI(userId, newUsername) {
+    if (!state.currentUser || state.currentUser.id !== userId) {
+        throw new Error("User mismatch or not logged in for updating username.");
+    }
+    const { data, error } = await supabaseClient
+        .from('profiles')
+        .update({ username: newUsername, updated_at: new Date().toISOString() })
+        .eq('id', userId)
+        .select() // Select to get the updated data, though username might be the only thing changing here
+        .single();
+
+    if (error) {
+        // Check for unique constraint violation (Supabase error code 23505 for PostgreSQL)
+        if (error.code === '23505') {
+            throw new Error("This username is already taken. Please choose another.");
+        }
+        throw error;
+    }
+    return data; // Returns the updated profile data (or at least the username part)
+}
+
+// Password update is directly via Supabase auth, typically handled in authService
+// No separate 'API' function here for it unless we add extra logic around it.
+// For example, supabaseClient.auth.updateUser({ password: newPassword })
+
+// Email update is also directly via Supabase auth
+// For example, supabaseClient.auth.updateUser({ email: newEmail })
