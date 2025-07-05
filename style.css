@@ -526,10 +526,12 @@ ul.styled-list { /* Remove default list styling if ul is used */
     padding: 1em;
     border-radius: 8px;
     box-shadow: var(--box-shadow);
+    min-height: 300px; /* Prevent collapsing when list below changes */
+    position: relative; /* Good for Chart.js responsiveness and tooltips */
 }
 #detailedExerciseChart {
     max-width: 100%;
-    height: auto !important;
+    /* height: auto !important; -- Removed, let Chart.js handle it */
 }
 
 /* 1RM Calculator Styling */
