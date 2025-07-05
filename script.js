@@ -1484,8 +1484,15 @@ document.addEventListener('DOMContentLoaded', () => {
         const month = parseInt(selectedDateStr.substring(5, 7)) - 1; // Month is 0-indexed
         const day = parseInt(selectedDateStr.substring(8, 10));
 
-        const combinedDateTime = new Date(year, month, day, now.getHours(), now.getMinutes(), now.getSeconds());
+        console.log("Selected Date String:", selectedDateStr);
+        console.log("Parsed Y/M/D:", year, month, day);
+
+        // Set time to midday in local timezone for the selected date to stabilize date part across UTC conversion
+        const combinedDateTime = new Date(year, month, day, 12, 0, 0, 0);
+        console.log("Combined Local DateTime (midday):", combinedDateTime.toString());
+
         newSetData.timestamp = combinedDateTime.toISOString();
+        console.log("Timestamp for Supabase (ISO UTC):", newSetData.timestamp);
 
         showFeedback("Adding set...", false);
         try {
