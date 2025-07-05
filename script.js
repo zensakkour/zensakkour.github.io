@@ -1,6 +1,24 @@
 document.addEventListener('DOMContentLoaded', () => {
     console.log("JavaScript file loaded and DOM fully parsed.");
 
+    // Utility function for YYYY-MM-DD formatting
+    function getYYYYMMDD(dateObj) {
+        if (!(dateObj instanceof Date) || isNaN(dateObj.getTime())) {
+            // Handle invalid date input if necessary, or let it error downstream
+            // For now, assume valid Date object is passed
+            const d = new Date(); // Fallback or throw error
+            console.warn("Invalid date passed to getYYYYMMDD, using current date as fallback:", dateObj)
+            const year = d.getFullYear();
+            const month = (d.getMonth() + 1).toString().padStart(2, '0');
+            const day = d.getDate().toString().padStart(2, '0');
+            return `${year}-${month}-${day}`;
+        }
+        const year = dateObj.getFullYear();
+        const month = (dateObj.getMonth() + 1).toString().padStart(2, '0');
+        const day = dateObj.getDate().toString().padStart(2, '0');
+        return `${year}-${month}-${day}`;
+    }
+
     // Supabase Client Initialization
     const SUPABASE_URL = 'https://cdbbaurycauyhlymmaec.supabase.co';
     const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNkYmJhdXJ5Y2F1eWhseW1tYWVjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTE2Mzc3NTcsImV4cCI6MjA2NzIxMzc1N30.gSMNIDm41JT6Ze79qawcqjIAn8Y4QsnwoXXRgzpv62s';
@@ -948,26 +966,42 @@ document.addEventListener('DOMContentLoaded', () => {
         const setsByDate = {};
         exercise.sets.forEach(set => {
             const setTimestamp = set.timestamp instanceof Date ? set.timestamp : new Date(set.timestamp);
-            if (isNaN(setTimestamp.getTime())) return; // Skip invalid timestamps
+            if (isNaN(setTimestamp.getTime())) {
+                console.warn("Skipping set with invalid timestamp in renderSetsForExercise:", set);
+                return;
+            }
 
-            const dateKey = setTimestamp.toLocaleDateString('en-CA'); // YYYY-MM-DD
+            const dateKey = getYYYYMMDD(setTimestamp); // Use utility function
             if (!setsByDate[dateKey]) {
                 setsByDate[dateKey] = [];
             }
             setsByDate[dateKey].push(set);
         });
 
-        const sortedDateKeys = Object.keys(setsByDate).sort((a, b) => new Date(b) - new Date(a)); // Most recent date first
+        const sortedDateKeys = Object.keys(setsByDate).sort((a, b) => {
+            // Ensure comparison is robust for date strings
+            const dateA = new Date(a.split('-')[0], parseInt(a.split('-')[1]) - 1, a.split('-')[2]);
+            const dateB = new Date(b.split('-')[0], parseInt(b.split('-')[1]) - 1, b.split('-')[2]);
+            return dateB - dateA; // Most recent date first
+        });
 
-        if (sortedDateKeys.length === 0) { // Should not happen if exercise.sets is not empty, but as a safeguard
-             setsListDiv.innerHTML = '<p class="empty-state-message">No valid sets to display.</p>';
+        if (sortedDateKeys.length === 0 && exercise.sets.length > 0) {
+             console.warn("No valid date keys generated in renderSetsForExercise, though sets exist.");
+             setsListDiv.innerHTML = '<p class="empty-state-message">Error processing set dates.</p>';
              return;
         }
+         if (sortedDateKeys.length === 0 && exercise.sets.length === 0) { //This is already handled at the top
+            // setsListDiv.innerHTML = '<p class="empty-state-message">No sets recorded for this instance. Add one below.</p>';
+            return;
+         }
+
 
         sortedDateKeys.forEach(dateKey => {
             const dateSeparator = document.createElement('div');
             dateSeparator.className = 'date-separator';
-            const displayDate = new Date(dateKey + 'T00:00:00'); // Ensure correct parsing for display
+            // Create Date object from YYYY-MM-DD for reliable formatting
+            const parts = dateKey.split('-');
+            const displayDate = new Date(parts[0], parseInt(parts[1]) - 1, parts[2]);
             dateSeparator.textContent = `---- ${displayDate.toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' })} ----`;
             setsListDiv.appendChild(dateSeparator);
 
