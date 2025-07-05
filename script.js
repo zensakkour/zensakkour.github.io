@@ -51,6 +51,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const setsListDiv = document.getElementById('sets-list');
     const setWeightInput = document.getElementById('set-weight');
     const setRepsInput = document.getElementById('set-reps');
+    const newSetDateInput = document.getElementById('new-set-date'); // New date input
     const addSetBtn = document.getElementById('add-set-btn');
     const backToExercisesBtn = document.getElementById('back-to-exercises-btn');
     const analysisSection = document.getElementById('analysis');
@@ -973,28 +974,28 @@ document.addEventListener('DOMContentLoaded', () => {
             editDateBtn.innerHTML = '&#9998;'; // Pencil icon for edit
             editDateBtn.className = 'edit-set-date-btn button-secondary button-small';
             editDateBtn.title = `Edit Date/Time for Set ${index + 1}`;
-            editDateBtn.style.marginLeft = "5px";
-            editDateBtn.addEventListener('click', (e) => {
-                e.stopPropagation(); // Prevent any parent handlers
-                // Pass the container, the set object, and context IDs
-                showSetTimestampEditUI(setItemContainer, set, sessionId, exerciseId);
-            });
+            // editDateBtn.style.marginLeft = "5px";
+            // editDateBtn.addEventListener('click', (e) => {
+            //     e.stopPropagation(); // Prevent any parent handlers
+            //     // Pass the container, the set object, and context IDs
+            //     showSetTimestampEditUI(setItemContainer, set, sessionId, exerciseId);
+            // });
 
-            const buttonGroup = document.createElement('div');
-            buttonGroup.className = 'set-item-actions'; // For styling if needed
-            buttonGroup.appendChild(editDateBtn);
-            buttonGroup.appendChild(deleteBtn);
+            // const buttonGroup = document.createElement('div');
+            // buttonGroup.className = 'set-item-actions'; // For styling if needed
+            // buttonGroup.appendChild(editDateBtn);
+            // buttonGroup.appendChild(deleteBtn);
 
+            // setItemContainer.appendChild(setDetails);
+            // setItemContainer.appendChild(buttonGroup);
+            // setsListDiv.appendChild(setItemContainer);
+
+            // Simplified: only delete button for now per rollback
             setItemContainer.appendChild(setDetails);
-            setItemContainer.appendChild(buttonGroup);
+            setItemContainer.appendChild(deleteBtn); // Directly append deleteBtn
             setsListDiv.appendChild(setItemContainer);
         });
         // Placeholders are handled by findLastPerformedSetDetails earlier in the function
-        // const lastSet = sortedSetsCurrentInstance[sortedSetsCurrentInstance.length - 1];
-        // setWeightInput.placeholder = `Last: ${lastSet.weight} kg`;
-        // setRepsInput.placeholder = `Last: ${lastSet.reps} reps`;
-        // setWeightInput.value = lastSet.weight; // Optionally prefill for editing
-        // setRepsInput.value = lastSet.reps;
     }
 
     // --- Edit Body Weight Date Logic ---
@@ -1068,14 +1069,14 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-
+    // formatDateTimeForInput might be useful later, so it's commented out instead of removed for now.
+    /*
     function formatDateTimeForInput(date) {
         if (!(date instanceof Date)) {
             date = new Date(date); // Try to convert if it's a string
         }
         if (isNaN(date.getTime())) { // Invalid date
             console.error("Invalid date provided to formatDateTimeForInput:", date);
-            // Return a value that won't break the input, or handle error appropriately
             const now = new Date();
             return `${now.getFullYear()}-${(now.getMonth() + 1).toString().padStart(2, '0')}-${now.getDate().toString().padStart(2, '0')}T${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
         }
@@ -1086,92 +1087,11 @@ document.addEventListener('DOMContentLoaded', () => {
         const minutes = date.getMinutes().toString().padStart(2, '0');
         return `${year}-${month}-${day}T${hours}:${minutes}`;
     }
+    */
 
-    function showSetTimestampEditUI(setItemContainer, set, sessionId, exerciseId) {
-        // Hide existing content (setDetails span and the button group)
-        const setDetailsSpan = setItemContainer.querySelector('span'); // Assuming first span is details
-        const actionsDiv = setItemContainer.querySelector('.set-item-actions');
-        if (setDetailsSpan) setDetailsSpan.style.display = 'none';
-        if (actionsDiv) actionsDiv.style.display = 'none';
-
-        const currentTimestamp = set.timestamp instanceof Date ? set.timestamp : new Date(set.timestamp);
-
-        const input = document.createElement('input');
-        input.type = 'datetime-local';
-        input.value = formatDateTimeForInput(currentTimestamp);
-        input.className = 'edit-timestamp-input';
-        input.style.marginRight = '5px';
-
-        const saveBtn = document.createElement('button');
-        saveBtn.textContent = 'Save';
-        saveBtn.className = 'button-primary button-small';
-        saveBtn.onclick = async () => {
-            const newTimestampISO = new Date(input.value).toISOString();
-            await saveSetTimestamp(sessionId, exerciseId, set.id, newTimestampISO);
-            // UI will be refreshed by renderSetsForExercise called in saveSetTimestamp
-        };
-
-        const cancelBtn = document.createElement('button');
-        cancelBtn.textContent = 'Cancel';
-        cancelBtn.className = 'button-secondary button-small';
-        cancelBtn.style.marginLeft = '5px';
-        cancelBtn.onclick = () => {
-            // Simply re-render to cancel: remove input and show original
-            if (setDetailsSpan) setDetailsSpan.style.display = '';
-            if (actionsDiv) actionsDiv.style.display = '';
-            input.remove();
-            saveBtn.remove();
-            cancelBtn.remove();
-            // Or call renderSetsForExercise(sessionId, exerciseId); for a cleaner full refresh
-        };
-
-        // Append new elements for editing
-        setItemContainer.appendChild(input);
-        setItemContainer.appendChild(saveBtn);
-        setItemContainer.appendChild(cancelBtn);
-        input.focus();
-    }
-
-    async function saveSetTimestamp(sessionId, exerciseId, setId, newTimestampISO) {
-        if (!currentUser) { showFeedback("You must be logged in.", true); return; }
-
-        // Validate newTimestampISO if necessary (e.g., ensure it's a valid date string)
-        if (!newTimestampISO || isNaN(new Date(newTimestampISO).getTime())) {
-            showFeedback("Invalid date/time selected.", true);
-            renderSetsForExercise(sessionId, exerciseId); // Refresh to clear bad input state
-            return;
-        }
-
-        showFeedback("Updating set timestamp...", false);
-        try {
-            const { error } = await supabaseClient
-                .from('sets')
-                .update({ timestamp: newTimestampISO, updated_at: new Date().toISOString() })
-                .eq('id', setId)
-                .eq('user_id', currentUser.id); // Ensure user owns the set
-
-            if (error) throw error;
-
-            // Update local gymData
-            const session = gymData.sessions.find(s => s.id === sessionId);
-            if (session) {
-                const exercise = session.exercises.find(ex => ex.id === exerciseId);
-                if (exercise) {
-                    const setObj = exercise.sets.find(s => s.id === setId);
-                    if (setObj) {
-                        setObj.timestamp = new Date(newTimestampISO); // Update with Date object
-                    }
-                }
-            }
-            showFeedback("Set timestamp updated!", false);
-        } catch (error) {
-            console.error("Error updating set timestamp:", error);
-            showFeedback(`Error: ${error.message}`, true);
-        } finally {
-            renderSetsForExercise(sessionId, exerciseId); // Refresh the list
-        }
-    }
-    // No explicit cancelSetTimestampEdit function needed if re-rendering is the cancel action
+    // Removing showSetTimestampEditUI and saveSetTimestamp as per rollback
+    // function showSetTimestampEditUI(setItemContainer, set, sessionId, exerciseId) { ... }
+    // async function saveSetTimestamp(sessionId, exerciseId, setId, newTimestampISO) { ... }
 
 
     // --- UI Navigation Functions ---
@@ -1215,6 +1135,12 @@ document.addEventListener('DOMContentLoaded', () => {
         exerciseViewContainer.style.display = 'none';
         detailedExerciseViewContainer.style.display = 'none';
         setTrackerContainer.style.display = 'block';
+
+        // Default the new set date input to today
+        if (newSetDateInput) {
+            newSetDateInput.valueAsDate = new Date();
+        }
+
         currentView = 'setTracker';
         saveViewState();
     }
@@ -1543,8 +1469,24 @@ document.addEventListener('DOMContentLoaded', () => {
             weight: weight,
             reps: reps,
             notes: notes, // Add notes if available
-            timestamp: new Date().toISOString() // Record when the set was added
+            // timestamp: new Date().toISOString() // Old: Record when the set was added
         };
+
+        // Construct timestamp from selected date and current time
+        const selectedDateStr = newSetDateInput.value; // YYYY-MM-DD
+        if (!selectedDateStr) {
+            showFeedback("Please select a date for the set.", true);
+            return;
+        }
+
+        const now = new Date();
+        const year = parseInt(selectedDateStr.substring(0, 4));
+        const month = parseInt(selectedDateStr.substring(5, 7)) - 1; // Month is 0-indexed
+        const day = parseInt(selectedDateStr.substring(8, 10));
+
+        const combinedDateTime = new Date(year, month, day, now.getHours(), now.getMinutes(), now.getSeconds());
+        newSetData.timestamp = combinedDateTime.toISOString();
+
         showFeedback("Adding set...", false);
         try {
             const { data, error } = await supabaseClient.from('sets').insert(newSetData).select().single();
