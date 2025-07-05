@@ -1303,10 +1303,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 item.className = 'set-item-historical';
                 const datePrefix = document.createElement('span');
                 datePrefix.className = 'date-prefix';
-                // Assuming set.sessionDate is reliable (YYYY-MM-DD string)
-                // And set.timestamp is a Date object
-                const sessionDisplayDate = new Date(set.sessionDate + 'T00:00:00').toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: '2-digit' });
-                datePrefix.textContent = `${sessionDisplayDate} (${set.sessionName}) Set @ ${set.timestamp.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}: `;
+                // Use set.timestamp directly as it's the most accurate date/time for the set itself.
+                // Ensure set.timestamp is a Date object. It should be after data loading or set creation.
+                const setActualTime = set.timestamp instanceof Date ? set.timestamp : new Date(set.timestamp);
+                const displayDate = setActualTime.toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: '2-digit' });
+                const displayTime = setActualTime.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+                datePrefix.textContent = `${displayDate} (${set.sessionName}) Set @ ${displayTime}: `;
                 item.appendChild(datePrefix);
                 item.append(`${set.weight} kg x ${set.reps} reps`);
                 if (set.notes) item.append(` (${set.notes})`);
