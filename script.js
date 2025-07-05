@@ -1363,22 +1363,31 @@ document.addEventListener('DOMContentLoaded', () => {
         } else { // 'allHistory'
             console.log("[renderDetailedExerciseView] Setting to display allHistory."); // INTENSIVE DEBUG
             toggleHistoryViewBtn.textContent = "Show Last Day's Sets"; // Updated text
+            // Ensure sets are sorted chronologically for day separator logic
             setsToDisplay = [...allSetsForExerciseName].sort((a,b) => a.timestamp - b.timestamp); // oldest first for display
             console.log("[renderDetailedExerciseView] Sets for allHistory display (count):", setsToDisplay.length); // INTENSIVE DEBUG
         }
 
-
+        // Common rendering logic for setsToDisplay
         if (setsToDisplay.length === 0) {
             detailedExerciseHistoryListEl.innerHTML = `<p class="empty-state-message">No sets found for this view (${detailedHistoryViewMode}).</p>`;
         } else {
+            let lastDisplayedDateStr = null; // For day separator logic
             setsToDisplay.forEach(set => {
+                const setActualTime = set.timestamp instanceof Date ? set.timestamp : new Date(set.timestamp);
+                const currentDateStr = setActualTime.toDateString(); // e.g., "Fri Jan 26 2024"
+
+                // Add separator if in 'allHistory' mode and date has changed
+                if (detailedHistoryViewMode === 'allHistory' && lastDisplayedDateStr && currentDateStr !== lastDisplayedDateStr) {
+                    const separator = document.createElement('hr');
+                    separator.className = 'day-separator';
+                    detailedExerciseHistoryListEl.appendChild(separator);
+                }
+
                 const item = document.createElement('div');
                 item.className = 'set-item-historical';
                 const datePrefix = document.createElement('span');
                 datePrefix.className = 'date-prefix';
-                // Use set.timestamp directly as it's the most accurate date/time for the set itself.
-                // Ensure set.timestamp is a Date object. It should be after data loading or set creation.
-                const setActualTime = set.timestamp instanceof Date ? set.timestamp : new Date(set.timestamp);
                 const displayDate = setActualTime.toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: '2-digit' });
                 const displayTime = setActualTime.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
                 datePrefix.textContent = `${displayDate} (${set.sessionName}) Set @ ${displayTime}: `;
@@ -1386,6 +1395,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 item.append(`${set.weight} kg x ${set.reps} reps`);
                 if (set.notes) item.append(` (${set.notes})`);
                 detailedExerciseHistoryListEl.appendChild(item);
+
+                if (detailedHistoryViewMode === 'allHistory') {
+                    lastDisplayedDateStr = currentDateStr;
+                }
 
                 // Populate 1RM calculator with sets from the current view (setsToDisplay)
                 if (set.reps > 0 && set.weight > 0) {

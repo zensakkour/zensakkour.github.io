@@ -679,3 +679,11 @@ ul.styled-list { /* Remove default list styling if ul is used */
 .hidden {
     display: none !important;
 }
+
+/* Separator for sets on different days in detailed history view */
+hr.day-separator {
+    margin-top: 15px;
+    margin-bottom: 10px;
+    border: 0;
+    border-top: 1px solid #555; /* A medium gray, adjust as needed for theme */
+}
