@@ -85,6 +85,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let currentViewingExerciseName = null;
     let currentUser = null; // Holds user object from Supabase, including profile data after load
     let currentView = 'sessionList'; // To track the current active view for session storage
+    let appInitializedOnce = false; // Flag to prevent re-initialization issues
 
     // --- View State Persistence ---
     function saveViewState() {
@@ -1615,17 +1616,52 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // --- Authentication Logic & Initial UI Setup ---
     function updateUIForAuthState(user) {
+        console.log("updateUIForAuthState called with user:", user, "currentUser:", currentUser, "appInitializedOnce:", appInitializedOnce);
+        const previousUser = currentUser;
         currentUser = user;
+
         if (user) {
-            userEmailSpan.textContent = user.email;
-            userStatusDiv.style.display = 'flex';
-            loginForm.style.display = 'none';
-            signupForm.style.display = 'none';
-            authContainer.style.display = 'none';
-            mainNav.style.display = 'block';
-            mainContent.style.display = 'block';
-            initializeAppData();
-        } else {
+            if (previousUser && user.id === previousUser.id && appInitializedOnce) {
+                // User is the same, app already initialized.
+                // This might be a token refresh or tab refocus.
+                // We might not need to call initializeAppData() again,
+                // as it could unnecessarily reload data and reset views.
+                // The view restoration logic in initializeAppData should handle being re-entered,
+                // but avoiding the call if possible is cleaner.
+                console.log("User unchanged and app initialized. Skipping full re-initialization.");
+                // Ensure UI elements like user email are up-to-date if profile changed, but avoid full app init.
+                if (currentUser.username) userEmailSpan.textContent = currentUser.username;
+                else userEmailSpan.textContent = currentUser.email;
+                // Make sure nav and main content are visible if they were hidden
+                mainNav.style.display = 'block';
+                mainContent.style.display = 'block';
+                authContainer.style.display = 'none'; // Ensure auth forms are hidden
+                userStatusDiv.style.display = 'flex';
+
+                // Crucially, if the view was somehow lost (e.g. if a full page reload happened despite SPA intentions)
+                // and sessionStorage has the state, initializeAppData is the one that restores it.
+                // So, the question is: under what conditions do we *not* call initializeAppData?
+                // Perhaps only if the event that triggered onAuthStateChange was *not* 'SIGNED_IN' or 'INITIAL_SESSION'.
+                // For now, let's assume if user is same and app initialized, the view state should persist
+                // from interaction or prior restoration. The main concern is an unnecessary `loadData()`.
+                // However, `initializeAppData` now has checks to be less disruptive.
+                // Let's call it but rely on its internal logic to be less disruptive.
+                initializeAppData(); // It will check appInitializedOnce and attempt to restore view.
+            } else {
+                // New user, or first load for this user, or user changed.
+                console.log("New user or first initialization for this user. Running initializeAppData.");
+                userEmailSpan.textContent = user.email; // Initial set before profile load
+                userStatusDiv.style.display = 'flex';
+                loginForm.style.display = 'none';
+                signupForm.style.display = 'none';
+                authContainer.style.display = 'none';
+                mainNav.style.display = 'block';
+                mainContent.style.display = 'block';
+                appInitializedOnce = false; // Force re-initialization if user changed or first time
+                initializeAppData();
+            }
+        } else { // No user
+            console.log("No user session. Clearing UI and state.");
             userStatusDiv.style.display = 'none';
             authContainer.style.display = 'block';
             loginForm.style.display = 'block';
@@ -1671,18 +1707,45 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     async function initializeAppData() {
-        setupNavEventListeners(); // Ensure nav links work correctly
+        console.log("initializeAppData called. appInitializedOnce:", appInitializedOnce, "currentUser:", currentUser);
 
-        await loadData(); // Load gym data (sessions, bodyweight)
-        await loadUserProfile(); // Load user profile (username, etc.)
+        // If already initialized and just switching tabs with the same user,
+        // we might not need to do much beyond ensuring the view is correct.
+        // However, data might have changed, so loadData() is often still needed.
+        // The key is to prevent it from blowing away a restored view.
+        if (appInitializedOnce && currentUser) {
+            console.log("App already initialized. Re-validating view.");
+            // Data might need to be reloaded if stale, but let's first focus on view persistence.
+            // For now, we assume loadData() will be called if auth state truly changes or on first load.
+            // The main problem is if loadData() + subsequent UI reset happens on simple tab focus.
+        }
+
+        setupNavEventListeners();
+
+        // Only load data if we have a user and it's either the first init or data might be stale.
+        // For now, let's always load data if there's a user, but be careful about UI reset.
+        if (currentUser) {
+            await loadData();
+            await loadUserProfile();
+        } else {
+            // No user, ensure gymData is cleared
+            gymData = { sessions: [], bodyWeightLog: [] };
+            renderSessions();
+            renderBodyWeightHistory();
+            appInitializedOnce = false; // Reset flag if user logs out
+            return; // Nothing more to do if no user
+        }
+
 
         // Try to restore view state AFTER data is loaded
         const restoredState = loadAndRestoreViewState();
-        if (restoredState && gymData.sessions.length > 0) { // Ensure data is available to restore into
+        if (restoredState && currentUser && gymData.sessions) {
+            // Added currentUser check and ensured gymData.sessions exists
+            // (gymData.sessions.length > 0 check was removed to allow restoration even if a session was just created and is empty)
             currentSessionId = restoredState.currentSessionId;
             currentExerciseId = restoredState.currentExerciseId;
             currentViewingExerciseName = restoredState.currentViewingExerciseName;
-            currentView = restoredState.currentView;
+            currentView = restoredState.currentView; // Ensure currentView is also restored before logic below uses it
 
             console.log("Attempting to restore view to:", currentView, "with state:", restoredState);
 
@@ -1758,16 +1821,28 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         const activeNavLink = document.querySelector(activeNavLinkSelector);
         if (activeNavLink) activeNavLink.classList.add('active');
+        appInitializedOnce = true; // Mark app as initialized
     }
 
     supabaseClient.auth.onAuthStateChange(async (event, session) => {
-        console.log('Auth event:', event, 'Session:', session);
+        console.log(`onAuthStateChange event: ${event}`, session);
         const user = session ? session.user : null;
+
+        if (event === 'INITIAL_SESSION' && user && appInitializedOnce) {
+            console.log("INITIAL_SESSION event, but app already initialized. May not need to re-run full UI update.");
+            // If user is the same, perhaps only a light refresh or view validation is needed.
+            // For now, let updateUIForAuthState handle it, but this is a point for future optimization.
+            // Potentially, if currentUser is same as user, and appInitializedOnce is true,
+            // we could skip parts of updateUIForAuthState or initializeAppData.
+        }
+
         if (event === 'SIGNED_OUT') {
             clearViewState(); // Clear view state on logout
+            appInitializedOnce = false; // Reset flag
         }
-        // If user state changes, call updateUIForAuthState.
-        // updateUIForAuthState will then call initializeAppData if it's a login.
+
+        // If user state changes OR if it's the initial load with a session, update UI.
+        // updateUIForAuthState will call initializeAppData if it's a login or initial session.
         updateUIForAuthState(user);
     });
 
