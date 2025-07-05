@@ -687,3 +687,266 @@ hr.day-separator {
     border: 0;
     border-top: 1px solid #555; /* A medium gray, adjust as needed for theme */
 }
+
+/* Hamburger Menu Button */
+.hamburger-menu {
+    display: none; /* Hidden by default, shown on mobile */
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 10px;
+    position: absolute; /* Position relative to header */
+    top: 15px; /* Adjust as needed */
+    left: 15px; /* Adjust as needed */
+    z-index: 1001; /* Ensure it's above other header content if necessary */
+}
+
+.hamburger-menu span {
+    display: block;
+    width: 25px;
+    height: 3px;
+    background-color: var(--on-surface-color); /* Hamburger line color */
+    margin: 5px 0;
+    transition: all 0.3s ease-in-out;
+}
+
+/* Styles for when the menu is open (JS will toggle .nav-open on nav or nav ul) */
+/* Example: Hamburger icon transform to 'X' */
+.hamburger-menu.active span:nth-child(1) {
+    transform: translateY(8px) rotate(45deg);
+}
+.hamburger-menu.active span:nth-child(2) {
+    opacity: 0;
+}
+.hamburger-menu.active span:nth-child(3) {
+    transform: translateY(-8px) rotate(-45deg);
+}
+
+
+/* Responsive Navigation Styles */
+@media (max-width: 768px) {
+    /* Original nav ul li styling from earlier media query might need adjustment or removal */
+    /* nav ul li { margin: 0 0.5em; } */ /* This might conflict if we want full width items */
+
+    .hamburger-menu {
+        display: block; /* Show hamburger on mobile */
+    }
+
+    nav {
+        /* position: relative; */ /* If nav ul is absolute, nav might need to be relative */
+    }
+
+    nav ul {
+        display: none; /* Hide nav ul by default on mobile */
+        flex-direction: column;
+        position: absolute; /* Or fixed, depending on desired effect */
+        top: 70px; /* Adjust based on header height */
+        left: 0;
+        width: 100%;
+        background-color: var(--nav-background); /* Same as desktop nav or slightly different */
+        padding: 0;
+        margin: 0;
+        box-shadow: 0 2px 5px rgba(0,0,0,0.2); /* Add shadow if it overlays content */
+        z-index: 1000; /* Ensure it's above main content */
+    }
+
+    nav ul.nav-open { /* This class will be toggled by JS */
+        display: flex; /* Show the menu */
+    }
+
+    nav ul li {
+        display: block; /* Make li full width */
+        width: 100%;
+        margin: 0;
+        text-align: left; /* Or center, depending on preference */
+    }
+
+    nav ul li a {
+        display: block;
+        padding: 1em; /* Adjust padding for touch targets */
+        width: 100%;
+        box-sizing: border-box;
+        border-bottom: 1px solid var(--input-border); /* Separator for items */
+        color: var(--on-surface-color);
+    }
+    nav ul li a:hover, nav ul li a.active {
+        background-color: var(--nav-active-background);
+        color: var(--primary-color);
+    }
+
+    nav ul li:last-child a {
+        border-bottom: none; /* Remove border from last item */
+    }
+
+    /* Adjust main content padding if nav becomes fixed/absolute and overlays */
+    /* main.nav-open-padding { padding-top: 200px; } */ /* Example if nav pushes content */
+
+    /* Increased touch targets for list item buttons on mobile */
+    .list-item-container > .button {
+        padding: 15px 20px; /* Increased padding */
+    }
+
+    .list-item-container .delete-btn,
+    .list-item-container .rename-btn {
+        padding: 10px 15px; /* Larger padding for easier tapping */
+        font-size: 1em; /* Ensure font size is not too small */
+    }
+
+    #sets-list .set-item {
+        padding: 12px 15px; /* Increased padding */
+    }
+    .set-item .delete-btn {
+        padding: 8px 12px; /* Increased padding for set delete buttons */
+        font-size: 0.9em;
+    }
+
+    /* Specific for historical set items if they are different */
+    #detailed-exercise-history-list .set-item-historical {
+        padding: 10px 15px; /* Slightly more padding */
+    }
+
+    /* Responsive Form Controls */
+    .controls-group {
+        flex-direction: column; /* Stack items vertically */
+        align-items: stretch; /* Make items take full width */
+    }
+    .controls-group input[type="text"],
+    .controls-group input[type="number"],
+    .controls-group input[type="date"], /* Added date input */
+    .controls-group select,
+    .controls-group button {
+        width: 100%; /* Make form elements full width */
+        margin-bottom: 10px; /* Add space between stacked items */
+    }
+    .controls-group button {
+        margin-left: 0; /* Reset any horizontal margins if they were for inline display */
+        margin-right: 0;
+    }
+    .controls-group label { /* Ensure labels also stack well if they are part of the group */
+        margin-bottom: 5px;
+        width: 100%; /* If they need to align with full-width inputs */
+    }
+
+    /* Auth forms are generally okay due to existing width: 100% on inputs/buttons */
+    /* Profile forms specific adjustments if needed */
+    #profile-details .controls-group,
+    #change-password-section .controls-group,
+    #change-email-section .controls-group {
+        /* These will inherit .controls-group stacking, ensure children are full width */
+    }
+    #profile-details input[type="text"],
+    #change-password-section input[type="password"],
+    #change-email-section input[type="email"] {
+        /* Already likely 100% width from general input styling or .controls-group */
+    }
+     /* Ensure buttons in profile also take full width if desired, or adjust their container */
+    #save-profile-btn, #change-password-btn, #change-email-btn {
+        width: auto; /* Let them be auto, or set to 100% if they are direct children of a column flex group */
+        /* If they are inside a .controls-group that is now column, they will be 100% from above rule */
+    }
+
+    /* Specific adjustments for 1RM calculator controls if they don't look good */
+    #one-rep-max-calculator .controls-group {
+        /* Will inherit general stacking. May need label width adjustment */
+    }
+    #one-rep-max-calculator .controls-group label {
+         flex-basis: auto; /* Reset flex-basis if it was for horizontal layout */
+         width: 100%;
+         margin-bottom: 5px;
+    }
+    #set-for-1rm-select, #calculate-1rm-btn {
+        min-width: unset; /* Reset min-width if it constrains full-width stacking */
+        width: 100%;
+    }
+
+    /* General Typographic Adjustments for Mobile */
+    section h2 {
+        font-size: 1.5em; /* Slightly smaller section titles on mobile */
+    }
+    h3 { /* General h3, like currentSessionTitle, currentExerciseTitleSet */
+        font-size: 1.25em;
+    }
+    p, label, span, li { /* Base text elements */
+        font-size: 0.95em; /* Ensure readability, adjust if too small/large */
+    }
+    button { /* Ensure button text isn't too tiny */
+        font-size: 0.95em;
+    }
+     /* Specific button adjustments already made for padding, this is for font if needed */
+    .list-item-container .delete-btn,
+    .list-item-container .rename-btn {
+        font-size: 0.9em; /* Slightly smaller than main button text if desired, or match */
+    }
+    .set-item .delete-btn {
+        font-size: 0.85em;
+    }
+
+
+    /* Analysis Section Mobile Adjustments */
+    .analysis-controls {
+        flex-direction: column; /* Stack controls */
+        align-items: stretch;
+    }
+    .analysis-controls label,
+    .analysis-controls select,
+    .analysis-controls button {
+        width: 100%;
+        margin-bottom: 10px;
+    }
+    #multi-exercise-select-analysis {
+        min-height: 80px; /* Slightly reduce height if it's too much on mobile */
+    }
+    #raw-data-output {
+        font-size: 0.85em; /* Smaller font for preformatted text if needed */
+        max-height: 250px; /* Adjust height */
+    }
+
+    /* Chart containers - ensure they don't cause overflow */
+    #progress-chart-container,
+    #detailed-exercise-chart-container {
+        padding: 0.75em; /* Reduce padding slightly */
+        min-height: 250px; /* Ensure they have some height */
+    }
+
+
+    /* Profile Section Mobile Adjustments */
+    #profile-details,
+    #change-password-section,
+    #change-email-section {
+        /* Controls group styling should handle most of it. Add specific margins if needed */
+    }
+    #profile-feedback, #password-feedback, #email-feedback {
+        font-size: 0.9em;
+        padding: 8px;
+    }
+
+    /* Footer adjustment if content is pushed by keyboard */
+    /* body:has(input:focus) footer { display: none; } */ /* Advanced, might not be needed widely */
+
+}
+
+/* Further adjustments for very small screens if necessary */
+@media (max-width: 480px) {
+    section h2 {
+        font-size: 1.3em;
+    }
+    h3 {
+        font-size: 1.1em;
+    }
+    main {
+        padding: 0.5em; /* Reduce main padding further */
+    }
+    section {
+        padding: 0.75em; /* Reduce section padding */
+    }
+    button, .button {
+        padding: 8px 15px; /* Slightly smaller general buttons */
+        font-size: 0.9em;
+    }
+    .controls-group input[type="text"],
+    .controls-group input[type="number"],
+    .controls-group input[type="date"],
+    .controls-group select {
+        padding: 10px; /* Slightly smaller input padding */
+    }
+}
