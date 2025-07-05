@@ -48,7 +48,35 @@
                 <button id="save-profile-btn" class="button-primary">Save Username</button>
             </div>
             <div id="profile-feedback" style="margin-top:1em; padding: 10px; border-radius: 5px; display:none;"></div>
-             <!-- This div will be used for feedback messages directly within the profile section -->
+            <!-- This div will be used for feedback messages directly within the profile section -->
+
+            <hr style="margin: 2em 0;">
+
+            <h4>Change Password</h4>
+            <div id="change-password-section">
+                <div class="controls-group">
+                    <label for="profile-new-password">New Password:</label>
+                    <input type="password" id="profile-new-password" placeholder="Enter new password (min. 6 characters)">
+                </div>
+                <div class="controls-group">
+                    <label for="profile-confirm-password">Confirm New Password:</label>
+                    <input type="password" id="profile-confirm-password" placeholder="Confirm new password">
+                </div>
+                <button id="change-password-btn" class="button-primary">Change Password</button>
+            </div>
+            <div id="password-feedback" style="margin-top:1em; padding: 10px; border-radius: 5px; display:none;"></div>
+
+            <hr style="margin: 2em 0;">
+
+            <h4>Change Email</h4>
+            <div id="change-email-section">
+                <div class="controls-group">
+                    <label for="profile-new-email">New Email:</label>
+                    <input type="email" id="profile-new-email" placeholder="Enter new email address">
+                </div>
+                <button id="change-email-btn" class="button-primary">Request Email Change</button>
+            </div>
+            <div id="email-feedback" style="margin-top:1em; padding: 10px; border-radius: 5px; display:none;"></div>
         </section>
 
         <section id="sessions">
@@ -81,10 +109,14 @@
                     <button id="back-to-exercise-list-from-detail-btn" class="button-secondary">Back to Session Exercises</button>
                 </div>
                 <h4>History for this Exercise (All Sessions):</h4>
+                <div class="controls-group"> <!-- Using a group for alignment -->
+                    <h4 style="margin-top:0; margin-bottom:0;">History:</h4>
+                    <button id="toggle-history-view-btn" class="button-secondary button-small" style="margin-left:10px;">Show All History</button>
+                </div>
                 <div id="detailed-exercise-history-list">
                     <!-- Historical sets will be listed here -->
                 </div>
-                <h4>Progress Chart:</h4>
+                <h4>Progress Chart (All Time):</h4>
                 <div id="detailed-exercise-chart-container">
                     <canvas id="detailedExerciseChart"></canvas>
                 </div>
