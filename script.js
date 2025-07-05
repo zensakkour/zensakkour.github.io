@@ -84,6 +84,51 @@ document.addEventListener('DOMContentLoaded', () => {
     let currentExerciseId = null;
     let currentViewingExerciseName = null;
     let currentUser = null; // Holds user object from Supabase, including profile data after load
+    let currentView = 'sessionList'; // To track the current active view for session storage
+
+    // --- View State Persistence ---
+    function saveViewState() {
+        if (!currentUser) return; // Don't save view state if logged out
+        try {
+            const viewState = {
+                currentSessionId,
+                currentExerciseId,
+                currentViewingExerciseName,
+                currentView
+            };
+            sessionStorage.setItem('gymTrackerViewState', JSON.stringify(viewState));
+            console.log("View state saved:", viewState);
+        } catch (e) {
+            console.error("Error saving view state to sessionStorage:", e);
+        }
+    }
+
+    function loadAndRestoreViewState() {
+        if (!currentUser) return null; // Don't load if no user
+        try {
+            const savedStateJSON = sessionStorage.getItem('gymTrackerViewState');
+            if (savedStateJSON) {
+                const savedState = JSON.parse(savedStateJSON);
+                console.log("View state loaded from sessionStorage:", savedState);
+                return savedState;
+            }
+        } catch (e) {
+            console.error("Error loading view state from sessionStorage:", e);
+            sessionStorage.removeItem('gymTrackerViewState'); // Clear corrupted state
+        }
+        return null;
+    }
+
+    function clearViewState() {
+        sessionStorage.removeItem('gymTrackerViewState');
+        console.log("View state cleared from sessionStorage.");
+        // Reset global state variables to default when view state is cleared (e.g., on logout or explicit navigation to home)
+        currentSessionId = null;
+        currentExerciseId = null;
+        currentViewingExerciseName = null;
+        currentView = 'sessionList';
+    }
+
 
     // --- Supabase Data Functions ---
 
@@ -264,8 +309,9 @@ document.addEventListener('DOMContentLoaded', () => {
             button.addEventListener('click', (e) => {
                 if (e.target.closest('.delete-btn')) return;
                 currentSessionId = session.id; // Supabase ID is BIGINT, JS handles large numbers
+                // currentViewingExerciseName and currentExerciseId are reset in showExerciseView if not restoring
                 renderExercisesForSession(session.id);
-                showExerciseView();
+                showExerciseView(); // This will call saveViewState
             });
 
             const deleteBtn = document.createElement('button');
@@ -277,7 +323,23 @@ document.addEventListener('DOMContentLoaded', () => {
                 deleteSession(session.id); // Will be updated for Supabase
             });
 
+            const renameBtn = document.createElement('button');
+            renameBtn.textContent = 'Rename';
+            renameBtn.className = 'rename-btn button-secondary'; // Add appropriate class
+            renameBtn.style.marginLeft = '5px'; // Add some spacing
+            renameBtn.title = `Rename session: ${session.name}`;
+            renameBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                // Prevent drag from starting if clicking rename
+                if (sessionItemContainer.draggable) {
+                    sessionItemContainer.draggable = false;
+                    setTimeout(() => sessionItemContainer.draggable = true, 100); // Re-enable after click processes
+                }
+                handleRenameSession(session.id, sessionItemContainer, button);
+            });
+
             sessionItemContainer.appendChild(button);
+            sessionItemContainer.appendChild(renameBtn);
             sessionItemContainer.appendChild(deleteBtn);
             sessionItemContainer.addEventListener('dragstart', handleDragStartSession);
             sessionItemContainer.addEventListener('dragover', handleDragOverSession);
@@ -366,6 +428,127 @@ document.addEventListener('DOMContentLoaded', () => {
         document.querySelectorAll('.list-item-container.drag-over-session').forEach(item => item.classList.remove('drag-over-session'));
     }
 
+    // --- Rename Session Logic ---
+    function handleRenameSession(sessionId, sessionItemContainer, sessionButtonElement) {
+        const session = gymData.sessions.find(s => s.id === sessionId);
+        if (!session) return;
+
+        // Temporarily disable drag if it's on the container
+        const wasDraggable = sessionItemContainer.draggable;
+        sessionItemContainer.draggable = false;
+
+        const originalName = session.name;
+        const originalButtonContent = sessionButtonElement.textContent; // Or however you store the name visually
+
+        // Hide original session button and rename/delete buttons for this item
+        sessionButtonElement.style.display = 'none';
+        sessionItemContainer.querySelectorAll('.rename-btn, .delete-btn').forEach(btn => btn.style.display = 'none');
+
+        const input = document.createElement('input');
+        input.type = 'text';
+        input.value = originalName;
+        input.className = 'rename-input'; // For styling
+        input.style.flexGrow = '1';
+        input.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                saveSessionName(sessionId, input, sessionItemContainer, sessionButtonElement, wasDraggable);
+            } else if (e.key === 'Escape') {
+                cancelRenameSession(originalName, sessionItemContainer, sessionButtonElement, wasDraggable);
+            }
+        });
+
+        const saveBtn = document.createElement('button');
+        saveBtn.textContent = 'Save';
+        saveBtn.className = 'button-primary';
+        saveBtn.style.marginLeft = '5px';
+        saveBtn.onclick = () => saveSessionName(sessionId, input, sessionItemContainer, sessionButtonElement, wasDraggable);
+
+        const cancelBtn = document.createElement('button');
+        cancelBtn.textContent = 'Cancel';
+        cancelBtn.className = 'button-secondary';
+        cancelBtn.style.marginLeft = '5px';
+        cancelBtn.onclick = () => cancelRenameSession(originalName, sessionItemContainer, sessionButtonElement, wasDraggable);
+
+        // Insert input and new buttons. Prepend to keep them before any drag handles or other fixed elements if structure is complex.
+        // Assuming sessionButtonElement is the first significant child used for display.
+        sessionItemContainer.insertBefore(cancelBtn, sessionButtonElement); // Insert cancel before input
+        sessionItemContainer.insertBefore(saveBtn, cancelBtn);       // Insert save before cancel
+        sessionItemContainer.insertBefore(input, saveBtn);           // Insert input before save
+
+        input.focus();
+        input.select();
+    }
+
+    async function saveSessionName(sessionId, inputElement, sessionItemContainer, sessionButtonElement, wasDraggable) {
+        const newName = inputElement.value.trim();
+        const session = gymData.sessions.find(s => s.id === sessionId);
+
+        if (!session) {
+            showFeedback("Error: Session not found.", true);
+            renderSessions(); // Or a more targeted revert
+            return;
+        }
+        const originalName = session.name;
+
+        if (!newName) {
+            showFeedback("Session name cannot be empty.", true);
+            inputElement.value = originalName; // Revert input to original
+            inputElement.focus();
+            return;
+        }
+
+        if (newName === originalName) { // No change
+            cancelRenameSession(originalName, sessionItemContainer, sessionButtonElement, wasDraggable); // Just revert UI
+            return;
+        }
+
+        showFeedback("Saving new session name...", false);
+        try {
+            const { error } = await supabaseClient
+                .from('sessions')
+                .update({ name: newName, updated_at: new Date().toISOString() })
+                .eq('id', sessionId)
+                .eq('user_id', currentUser.id);
+
+            if (error) throw error;
+
+            session.name = newName; // Update local data
+            showFeedback("Session name updated!", false);
+        } catch (error) {
+            console.error("Error updating session name:", error);
+            showFeedback(`Error: ${error.message}`, true);
+            // No need to revert inputElement.value, let cancelRenameSession handle UI full restoration
+        } finally {
+            // Always restore UI, even if save failed, to show original or reflect change
+            renderSessions(); // Simplest way to restore everything correctly
+            // Re-enable drag if it was originally enabled
+            // This will be handled by renderSessions creating new elements.
+            // If we were manipulating the existing sessionItemContainer directly:
+            // if (wasDraggable) sessionItemContainer.draggable = true;
+        }
+    }
+
+    function cancelRenameSession(originalName, sessionItemContainer, sessionButtonElement, wasDraggable) {
+        // This function might be simplified if renderSessions() is called,
+        // as it will rebuild the item. The main purpose here is to remove the input field.
+        sessionItemContainer.querySelectorAll('.rename-input, .button-primary, .button-secondary').forEach(el => {
+            if (el.classList.contains('rename-input') || el.textContent === 'Save' || el.textContent === 'Cancel') {
+                el.remove();
+            }
+        });
+        sessionButtonElement.style.display = ''; // Restore original button
+        sessionButtonElement.textContent = originalName; // Ensure it has the correct name if save failed or was cancelled
+        sessionItemContainer.querySelectorAll('.rename-btn, .delete-btn').forEach(btn => btn.style.display = ''); // Restore original buttons
+
+        // Re-enable drag if it was originally enabled
+        if (wasDraggable) {
+            sessionItemContainer.draggable = true;
+        }
+        // Optionally, could call renderSessions() for a full refresh if easier
+        renderSessions();
+    }
+
+
     function renderExercisesForSession(sessionId) {
         const session = gymData.sessions.find(s => s.id === sessionId);
         if (!session) {
@@ -394,7 +577,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 currentViewingExerciseName = exercise.name;
                 currentExerciseId = exercise.id; // Supabase ID
                 renderDetailedExerciseView(exercise.name);
-                showDetailedExerciseView();
+                showDetailedExerciseView(); // This will call saveViewState
             });
 
             const deleteBtn = document.createElement('button');
@@ -406,7 +589,22 @@ document.addEventListener('DOMContentLoaded', () => {
                 deleteExercise(sessionId, exercise.id); // Will be updated for Supabase
             });
 
+            const renameBtn = document.createElement('button');
+            renameBtn.textContent = 'Rename';
+            renameBtn.className = 'rename-btn button-secondary';
+            renameBtn.style.marginLeft = '5px';
+            renameBtn.title = `Rename exercise: ${exercise.name}`;
+            renameBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                if (exerciseItemContainer.draggable) { // Prevent drag
+                    exerciseItemContainer.draggable = false;
+                    setTimeout(() => exerciseItemContainer.draggable = true, 100);
+                }
+                handleRenameExercise(sessionId, exercise.id, exerciseItemContainer, button);
+            });
+
             exerciseItemContainer.appendChild(button);
+            exerciseItemContainer.appendChild(renameBtn);
             exerciseItemContainer.appendChild(deleteBtn);
             exerciseItemContainer.addEventListener('dragstart', handleDragStartExercise);
             exerciseItemContainer.addEventListener('dragover', handleDragOverExercise);
@@ -511,6 +709,140 @@ document.addEventListener('DOMContentLoaded', () => {
         document.querySelectorAll('.exercise-drag-item.drag-over-exercise').forEach(item => item.classList.remove('drag-over-exercise'));
     }
 
+    // --- Rename Exercise Logic ---
+    function handleRenameExercise(sessionId, exerciseId, exerciseItemContainer, exerciseButtonElement) {
+        const session = gymData.sessions.find(s => s.id === sessionId);
+        if (!session) return;
+        const exercise = session.exercises.find(ex => ex.id === exerciseId);
+        if (!exercise) return;
+
+        const wasDraggable = exerciseItemContainer.draggable;
+        exerciseItemContainer.draggable = false;
+
+        const originalName = exercise.name;
+
+        exerciseButtonElement.style.display = 'none';
+        exerciseItemContainer.querySelectorAll('.rename-btn, .delete-btn').forEach(btn => btn.style.display = 'none');
+
+        const input = document.createElement('input');
+        input.type = 'text';
+        input.value = originalName;
+        input.className = 'rename-input';
+        input.style.flexGrow = '1';
+        input.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                saveExerciseName(sessionId, exerciseId, input, exerciseItemContainer, exerciseButtonElement, wasDraggable);
+            } else if (e.key === 'Escape') {
+                cancelRenameExercise(originalName, exerciseItemContainer, exerciseButtonElement, wasDraggable);
+            }
+        });
+
+        const saveBtn = document.createElement('button');
+        saveBtn.textContent = 'Save';
+        saveBtn.className = 'button-primary';
+        saveBtn.style.marginLeft = '5px';
+        saveBtn.onclick = () => saveExerciseName(sessionId, exerciseId, input, exerciseItemContainer, exerciseButtonElement, wasDraggable);
+
+        const cancelBtn = document.createElement('button');
+        cancelBtn.textContent = 'Cancel';
+        cancelBtn.className = 'button-secondary';
+        cancelBtn.style.marginLeft = '5px';
+        cancelBtn.onclick = () => cancelRenameExercise(originalName, exerciseItemContainer, exerciseButtonElement, wasDraggable);
+
+        exerciseItemContainer.insertBefore(cancelBtn, exerciseButtonElement);
+        exerciseItemContainer.insertBefore(saveBtn, cancelBtn);
+        exerciseItemContainer.insertBefore(input, saveBtn);
+
+        input.focus();
+        input.select();
+    }
+
+    async function saveExerciseName(sessionId, exerciseId, inputElement, exerciseItemContainer, exerciseButtonElement, wasDraggable) {
+        const newName = inputElement.value.trim();
+        const session = gymData.sessions.find(s => s.id === sessionId);
+        if (!session) { showFeedback("Error: Session not found.", true); renderExercisesForSession(currentSessionId); return; }
+        const exercise = session.exercises.find(ex => ex.id === exerciseId);
+        if (!exercise) { showFeedback("Error: Exercise not found.", true); renderExercisesForSession(currentSessionId); return; }
+
+        const originalName = exercise.name;
+
+        if (!newName) {
+            showFeedback("Exercise name cannot be empty.", true);
+            inputElement.value = originalName;
+            inputElement.focus();
+            return;
+        }
+
+        if (newName === originalName) {
+            cancelRenameExercise(originalName, exerciseItemContainer, exerciseButtonElement, wasDraggable);
+            return;
+        }
+
+        showFeedback("Saving new exercise name...", false);
+        try {
+            const { error } = await supabaseClient
+                .from('exercises')
+                .update({ name: newName, updated_at: new Date().toISOString() })
+                .eq('id', exerciseId)
+                .eq('user_id', currentUser.id) // Ensure user owns the exercise's session
+                .eq('session_id', sessionId);
+
+
+            if (error) throw error;
+
+            exercise.name = newName; // Update local data
+            showFeedback("Exercise name updated!", false);
+            // If this exercise was being viewed in detailed view, update title there
+            if (detailedExerciseViewContainer.style.display === 'block' && currentExerciseId === exerciseId) {
+                detailedExerciseNameEl.textContent = newName;
+                currentViewingExerciseName = newName; // Update global state if it was this one
+                saveViewState(); // Save updated name
+            }
+            // If this exercise name is present in analysis selection, update it there too
+            populateExerciseSelect(); // This will refresh the list in analysis tab
+            // Consider if the currently selected analysis exercise needs to be re-evaluated
+
+        } catch (error) {
+            console.error("Error updating exercise name:", error);
+            showFeedback(`Error: ${error.message}`, true);
+        } finally {
+            renderExercisesForSession(sessionId); // Re-render the list for this session
+            // Drag state will be reset by renderExercisesForSession
+        }
+    }
+
+    function cancelRenameExercise(originalName, exerciseItemContainer, exerciseButtonElement, wasDraggable) {
+        // Simplified: just re-render the exercises for the current session
+        renderExercisesForSession(currentSessionId);
+        // Drag state will be reset by renderExercisesForSession
+    }
+
+    // --- Helper to find the absolute last performed set details for an exercise name ---
+    function findLastPerformedSetDetails(exerciseName) {
+        let allSetsForThisExerciseName = [];
+        gymData.sessions.forEach(session => {
+            session.exercises.forEach(ex => {
+                if (ex.name === exerciseName && ex.sets && ex.sets.length > 0) {
+                    // Add session date to each set for sorting if timestamps are too close or missing
+                    // However, set.timestamp should be preferred and reliable
+                    ex.sets.forEach(s => allSetsForThisExerciseName.push({
+                        ...s,
+                        // Ensure timestamp is a Date object for reliable comparison
+                        timestamp: typeof s.timestamp === 'string' ? new Date(s.timestamp) : s.timestamp
+                    }));
+                }
+            });
+        });
+
+        if (allSetsForThisExerciseName.length === 0) {
+            return null;
+        }
+
+        // Sort by timestamp, most recent first
+        allSetsForThisExerciseName.sort((a, b) => b.timestamp - a.timestamp);
+        return allSetsForThisExerciseName[0]; // Return the most recent set's details
+    }
+
     function renderSetsForExercise(sessionId, exerciseId) {
         const session = gymData.sessions.find(s => s.id === sessionId);
         if (!session) return;
@@ -519,18 +851,34 @@ document.addEventListener('DOMContentLoaded', () => {
 
         currentExerciseTitleSet.textContent = `Tracking: ${exercise.name}`;
         setsListDiv.innerHTML = '';
-        if (!exercise.sets || exercise.sets.length === 0) {
-            setsListDiv.innerHTML = '<p class="empty-state-message">No sets recorded. Add one below.</p>';
+
+        // Update placeholders based on the absolute last time this exercise name was performed
+        const lastOverallSetDetails = findLastPerformedSetDetails(exercise.name);
+        if (lastOverallSetDetails) {
+            setWeightInput.placeholder = `Last overall: ${lastOverallSetDetails.weight} kg`;
+            setRepsInput.placeholder = `Last overall: ${lastOverallSetDetails.reps} reps`;
+        } else {
             setWeightInput.placeholder = "Weight (kg)";
             setRepsInput.placeholder = "Reps";
-            setWeightInput.value = '';
-            setRepsInput.value = '';
+        }
+        setWeightInput.value = ''; // Clear any previous input values
+        setRepsInput.value = '';
+
+        // Display sets for the CURRENT exercise instance
+        if (!exercise.sets || exercise.sets.length === 0) {
+            setsListDiv.innerHTML = '<p class="empty-state-message">No sets recorded for this instance. Add one below.</p>';
+            // Placeholders are already set above
             return;
         }
-        // Sort sets by timestamp (creation time)
-        const sortedSets = [...exercise.sets].sort((a,b) => new Date(a.timestamp) - new Date(b.timestamp));
 
-        sortedSets.forEach((set, index) => {
+        // Sort sets for the current instance by timestamp (creation time)
+        const sortedSetsCurrentInstance = [...exercise.sets].sort((a,b) => {
+            const timeA = typeof a.timestamp === 'string' ? new Date(a.timestamp) : a.timestamp;
+            const timeB = typeof b.timestamp === 'string' ? new Date(b.timestamp) : b.timestamp;
+            return timeA - timeB;
+        });
+
+        sortedSetsCurrentInstance.forEach((set, index) => {
             const setItemContainer = document.createElement('div');
             setItemContainer.className = 'set-item';
             const setDetails = document.createElement('span');
@@ -556,33 +904,48 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // --- UI Navigation Functions ---
-    function showSessionListView() {
+    function showSessionListView(isRestoring = false) {
         sessionListDiv.style.display = 'block';
         sessionViewControls.style.display = 'flex';
         exerciseViewContainer.style.display = 'none';
         setTrackerContainer.style.display = 'none';
         detailedExerciseViewContainer.style.display = 'none';
-        currentSessionId = null; // Reset context when going back to session list
-        currentExerciseId = null;
+
+        if (!isRestoring) { // Only reset context if not restoring a specific state
+            currentSessionId = null;
+            currentExerciseId = null;
+            currentViewingExerciseName = null;
+            clearViewState(); // Clear stored state when explicitly going to session list
+        }
+        currentView = 'sessionList';
+        saveViewState();
     }
-    function showExerciseView() {
+    function showExerciseView(isRestoring = false) {
         sessionListDiv.style.display = 'none';
         sessionViewControls.style.display = 'none';
         exerciseViewContainer.style.display = 'block';
         setTrackerContainer.style.display = 'none';
         detailedExerciseViewContainer.style.display = 'none';
-        currentExerciseId = null; // Reset context
-        currentViewingExerciseName = null;
+        if (!isRestoring) {
+            currentExerciseId = null;
+            currentViewingExerciseName = null;
+        }
+        currentView = 'exerciseView';
+        saveViewState();
     }
     function showDetailedExerciseView() {
         exerciseViewContainer.style.display = 'none';
         detailedExerciseViewContainer.style.display = 'block';
         setTrackerContainer.style.display = 'none';
+        currentView = 'detailedExerciseView';
+        saveViewState();
     }
     function showSetTracker() {
         exerciseViewContainer.style.display = 'none';
         detailedExerciseViewContainer.style.display = 'none';
         setTrackerContainer.style.display = 'block';
+        currentView = 'setTracker';
+        saveViewState();
     }
 
     // --- Deletion Functions (to be updated for Supabase) ---
@@ -682,52 +1045,81 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // --- Render Detailed Exercise View ---
     function renderDetailedExerciseView(exerciseName) {
-        currentViewingExerciseName = exerciseName;
+        currentViewingExerciseName = exerciseName; // This is exercise.name
         detailedExerciseNameEl.textContent = exerciseName;
         detailedExerciseHistoryListEl.innerHTML = '';
-        setFor1RMSelect.innerHTML = '<option value="">-- Choose a Set --</option>';
+        setFor1RMSelect.innerHTML = '<option value="">-- Choose a Set --</option>'; // Clear previous options
         calculated1RMResultEl.textContent = 'Estimated 1RM: -- kg';
 
-        const allSetsForExercise = [];
+        let allSetsForExerciseName = [];
         gymData.sessions.forEach(session => {
             session.exercises.forEach(ex => {
                 if (ex.name === exerciseName) {
-                    ex.sets.forEach(set => {
-                        allSetsForExercise.push({
-                            ...set, // set already contains weight, reps, timestamp (as Date obj)
-                            sessionDate: session.date, // Use actual date from session
-                            sessionName: session.name
+                    ex.sets.forEach(s => {
+                        allSetsForExerciseName.push({
+                            ...s, // contains s.id (set_id), s.exercise_id (original exercise instance id), weight, reps, timestamp
+                            timestamp: typeof s.timestamp === 'string' ? new Date(s.timestamp) : s.timestamp,
+                            sessionName: session.name, // Add session name for context
+                            sessionDate: session.date // Add session date for context
                         });
                     });
                 }
             });
         });
-        allSetsForExercise.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
 
-        if (allSetsForExercise.length === 0) {
-            detailedExerciseHistoryListEl.innerHTML = '<p class="empty-state-message">No history found.</p>';
+        // Sort all sets for this exercise NAME by timestamp, most recent first, to find the last performance
+        allSetsForExerciseName.sort((a, b) => b.timestamp - a.timestamp);
+
+        if (allSetsForExerciseName.length === 0) {
+            detailedExerciseHistoryListEl.innerHTML = '<p class="empty-state-message">No history found for this exercise.</p>';
+            document.getElementById('detailed-exercise-chart-container').style.display = 'none';
+            if (detailedExerciseChart) detailedExerciseChart.destroy();
+            return;
+        }
+
+        // Identify the specific exercise instance (original exercise_id) of the most recent set
+        const mostRecentSetOverall = allSetsForExerciseName[0];
+        const lastPerformedExerciseInstanceId = mostRecentSetOverall.exercise_id; // This is the key
+
+        // Filter to get all sets belonging to that last performed exercise instance
+        const setsFromLastPerformanceInstance = allSetsForExerciseName.filter(
+            s => s.exercise_id === lastPerformedExerciseInstanceId
+        );
+
+        // Sort these sets by their actual recorded timestamp for display order (oldest to newest for that instance)
+        setsFromLastPerformanceInstance.sort((a,b) => a.timestamp - b.timestamp);
+
+        if (setsFromLastPerformanceInstance.length === 0) { // Should not happen if allSetsForExerciseName was not empty
+            detailedExerciseHistoryListEl.innerHTML = '<p class="empty-state-message">No sets found for the last performance.</p>';
         } else {
-            allSetsForExercise.forEach(set => {
+            setsFromLastPerformanceInstance.forEach(set => {
                 const item = document.createElement('div');
                 item.className = 'set-item-historical';
                 const datePrefix = document.createElement('span');
                 datePrefix.className = 'date-prefix';
-                datePrefix.textContent = `${new Date(set.timestamp).toLocaleDateString()} (${set.sessionName}): `;
+                // Display the session date and name for clarity for this specific instance
+                datePrefix.textContent = `${new Date(set.sessionDate).toLocaleDateString()} (${set.sessionName}): `;
                 item.appendChild(datePrefix);
                 item.append(`${set.weight} kg x ${set.reps} reps`);
                 if (set.notes) item.append(` (${set.notes})`);
                 detailedExerciseHistoryListEl.appendChild(item);
+
+                // Populate 1RM calculator only with sets from this last performance instance
                 if (set.reps > 0 && set.weight > 0) {
                     const option = document.createElement('option');
                     option.value = JSON.stringify({ weight: set.weight, reps: set.reps });
-                    option.textContent = `${new Date(set.timestamp).toLocaleDateString()} - ${set.weight}kg x ${set.reps}reps (${set.sessionName})`;
+                    // Use set's own timestamp for the option text for precision
+                    option.textContent = `${new Date(set.timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})} - ${set.weight}kg x ${set.reps}reps`;
                     setFor1RMSelect.appendChild(option);
                 }
             });
         }
 
+        // Chart should still show all historical data for the exercise NAME for trend analysis
         if (detailedExerciseChart) detailedExerciseChart.destroy();
-        const chartDataPoints = allSetsForExercise.sort((a,b) => new Date(a.timestamp) - new Date(b.timestamp));
+        // allSetsForExerciseName is already sorted with most recent first, for chart sort oldest first
+        const chartDataPoints = [...allSetsForExerciseName].sort((a,b) => a.timestamp - b.timestamp);
+
         if (chartDataPoints.length > 0) {
             const labels = chartDataPoints.map(s => new Date(s.timestamp).toLocaleDateString());
             const weightData = chartDataPoints.map(s => s.weight);
@@ -774,17 +1166,21 @@ document.addEventListener('DOMContentLoaded', () => {
 
     goToSetTrackerBtn.addEventListener('click', () => {
         if (!currentSessionId || !currentExerciseId) {
-            alert("Error: Session or exercise context missing."); showExerciseView(); return;
+            alert("Error: Session or exercise context missing.");
+            showExerciseView(); // Will clear relevant state and save
+            return;
         }
         renderSetsForExercise(currentSessionId, currentExerciseId);
-        showSetTracker();
+        showSetTracker(); // Will call saveViewState
     });
 
     backToExerciseListFromDetailBtn.addEventListener('click', () => {
         if (currentSessionId) {
-            renderExercisesForSession(currentSessionId); showExerciseView();
+            // currentViewingExerciseName and currentExerciseId are reset in showExerciseView
+            renderExercisesForSession(currentSessionId);
+            showExerciseView(); // Will save state for exercise view
         } else {
-            showSessionListView();
+            showSessionListView(); // Will clear all state and save
         }
     });
 
@@ -1280,28 +1676,96 @@ document.addEventListener('DOMContentLoaded', () => {
         await loadData(); // Load gym data (sessions, bodyweight)
         await loadUserProfile(); // Load user profile (username, etc.)
 
-        // Default to sessions view after all data is loaded
-        document.getElementById('sessions').style.display = 'block';
-        document.getElementById('body-weight').style.display = 'none';
-        analysisSection.style.display = 'none';
-        const profileSection = document.getElementById('profile');
-        if(profileSection) profileSection.style.display = 'none';
+        // Try to restore view state AFTER data is loaded
+        const restoredState = loadAndRestoreViewState();
+        if (restoredState && gymData.sessions.length > 0) { // Ensure data is available to restore into
+            currentSessionId = restoredState.currentSessionId;
+            currentExerciseId = restoredState.currentExerciseId;
+            currentViewingExerciseName = restoredState.currentViewingExerciseName;
+            currentView = restoredState.currentView;
 
-        document.querySelectorAll('nav ul li a').forEach(nl => nl.classList.remove('active'));
-        const sessionsNavLink = document.querySelector('nav ul li a[href="#sessions"]');
-        if (sessionsNavLink) sessionsNavLink.classList.add('active');
+            console.log("Attempting to restore view to:", currentView, "with state:", restoredState);
 
-        // Initial rendering after data load
-        showSessionListView();
-        renderBodyWeightHistory();
+            // Hide all main sections first
+            appSections.forEach(section => section.style.display = 'none');
+            // Show the correct main section based on currentView (sessions, analysis, etc.)
+            // This logic might need to be more robust if views span multiple main sections
+            if (currentView === 'sessionList' || currentView === 'exerciseView' || currentView === 'detailedExerciseView' || currentView === 'setTracker') {
+                document.getElementById('sessions').style.display = 'block';
+            } else if (currentView === 'analysisView') { // Assuming 'analysisView' for analysis tab
+                analysisSection.style.display = 'block';
+            } else if (currentView === 'bodyWeightView') { // Assuming 'bodyWeightView'
+                 document.getElementById('body-weight').style.display = 'block';
+            } else if (currentView === 'profileView') { // Assuming 'profileView'
+                 document.getElementById('profile').style.display = 'block';
+            }
+
+
+            if (currentView === 'sessionList') {
+                showSessionListView(true); // Pass true to indicate restoration
+            } else if (currentView === 'exerciseView' && currentSessionId) {
+                const sessionExists = gymData.sessions.some(s => s.id === currentSessionId);
+                if (sessionExists) {
+                    renderExercisesForSession(currentSessionId);
+                    showExerciseView(true);
+                } else { // Fallback if session ID is invalid
+                    showSessionListView();
+                }
+            } else if (currentView === 'detailedExerciseView' && currentSessionId && currentViewingExerciseName) {
+                 const session = gymData.sessions.find(s => s.id === currentSessionId);
+                 const exercise = session ? session.exercises.find(ex => ex.name === currentViewingExerciseName) : null;
+                 if (exercise) {
+                    currentExerciseId = exercise.id; // Ensure currentExerciseId is set
+                    renderDetailedExerciseView(currentViewingExerciseName);
+                    showDetailedExerciseView();
+                 } else { showSessionListView(); }
+            } else if (currentView === 'setTracker' && currentSessionId && currentExerciseId) {
+                const session = gymData.sessions.find(s => s.id === currentSessionId);
+                const exercise = session ? session.exercises.find(ex => ex.id === currentExerciseId) : null;
+                if (exercise) {
+                    renderSetsForExercise(currentSessionId, currentExerciseId);
+                    showSetTracker();
+                } else { showSessionListView(); }
+            } else {
+                // Default to sessions view if no specific state or invalid state
+                showSessionListView();
+            }
+        } else {
+            // Default to sessions view if no saved state or no data
+            document.getElementById('sessions').style.display = 'block';
+            document.getElementById('body-weight').style.display = 'none';
+            analysisSection.style.display = 'none';
+            const profileSection = document.getElementById('profile');
+            if(profileSection) profileSection.style.display = 'none';
+            showSessionListView();
+        }
+
+        // Common UI updates after view restoration or default view set
+        renderBodyWeightHistory(); // Always render this
         bodyWeightDateInput.valueAsDate = new Date();
-        populateExerciseSelect();
-        handleAnalysisTypeChange();
+        populateExerciseSelect(); // For analysis tab
+        handleAnalysisTypeChange(); // For analysis tab
+
+        // Update active nav link based on the finally determined view
+        document.querySelectorAll('nav ul li a').forEach(nl => nl.classList.remove('active'));
+        let activeNavLinkSelector = 'nav ul li a[href="#sessions"]'; // Default
+        if (document.getElementById('analysis').style.display === 'block') {
+            activeNavLinkSelector = 'nav ul li a[href="#analysis"]';
+        } else if (document.getElementById('body-weight').style.display === 'block') {
+            activeNavLinkSelector = 'nav ul li a[href="#body-weight"]';
+        } else if (document.getElementById('profile').style.display === 'block') {
+            activeNavLinkSelector = 'nav ul li a[href="#profile"]';
+        }
+        const activeNavLink = document.querySelector(activeNavLinkSelector);
+        if (activeNavLink) activeNavLink.classList.add('active');
     }
 
     supabaseClient.auth.onAuthStateChange(async (event, session) => {
         console.log('Auth event:', event, 'Session:', session);
         const user = session ? session.user : null;
+        if (event === 'SIGNED_OUT') {
+            clearViewState(); // Clear view state on logout
+        }
         // If user state changes, call updateUIForAuthState.
         // updateUIForAuthState will then call initializeAppData if it's a login.
         updateUIForAuthState(user);
@@ -1363,10 +1827,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
     logoutBtn.addEventListener('click', async () => {
         showFeedback("Logging out...", false);
+        // clearViewState(); // Moved to onAuthStateChange SIGNED_OUT event
         try {
             const { error } = await supabaseClient.auth.signOut();
             if (error) throw error;
-            // onAuthStateChange will handle UI update
+            // onAuthStateChange will handle UI update & call clearViewState
             showFeedback("Logout successful.", false);
         } catch (error) {
             console.error('Logout error:', error);
