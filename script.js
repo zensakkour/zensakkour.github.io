@@ -242,24 +242,24 @@ document.addEventListener('DOMContentLoaded', () => {
             listItem.className = 'list-item body-weight-item';
 
             // Store original text content structure if needed, or just the parts
-            const originalDateStr = new Date(entry.date + 'T00:00:00').toLocaleDateString('en-GB');
+            const displayDateStr = new Date(entry.date + 'T00:00:00').toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: '2-digit' });
             const originalWeight = entry.weight;
 
             const textSpan = document.createElement('span');
             textSpan.className = 'bw-details-span'; // Class to easily find it
-            textSpan.textContent = `${originalDateStr} - ${originalWeight} kg`;
+            textSpan.textContent = `${displayDateStr} - ${originalWeight} kg`;
             listItem.appendChild(textSpan);
 
             const deleteBtn = document.createElement('button');
             deleteBtn.innerHTML = '&times;';
             deleteBtn.className = 'delete-btn button-danger';
-            deleteBtn.title = `Delete entry: ${new Date(entry.date + 'T00:00:00').toLocaleDateString('en-GB')}`; // Use en-GB for DD/MM/YYYY
+            deleteBtn.title = `Delete entry: ${displayDateStr}`;
             deleteBtn.onclick = () => deleteBodyWeightEntry(entry.id);
 
             const editBtn = document.createElement('button');
             editBtn.innerHTML = '&#9998;'; // Pencil icon
             editBtn.className = 'edit-bw-date-btn button-secondary button-small';
-            editBtn.title = `Edit date for entry on ${new Date(entry.date + 'T00:00:00').toLocaleDateString('en-GB')}`;
+            editBtn.title = `Edit date for entry on ${displayDateStr}`;
             editBtn.style.marginLeft = '5px';
             editBtn.onclick = (e) => {
                 e.stopPropagation();
@@ -291,7 +291,7 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
         const sortedLog = [...gymData.bodyWeightLog].sort((a, b) => new Date(a.date + 'T00:00:00') - new Date(b.date + 'T00:00:00'));
-        const labels = sortedLog.map(entry => new Date(entry.date + 'T00:00:00').toLocaleDateString('en-GB')); // Use DD/MM/YYYY
+        const labels = sortedLog.map(entry => new Date(entry.date + 'T00:00:00').toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: '2-digit' }));
         const weightData = sortedLog.map(entry => entry.weight);
         rawDataOutput.textContent = JSON.stringify(sortedLog.map(e => ({date: e.date, weight: e.weight})), null, 2);
         progressChart = new Chart(progressChartCanvas, {
@@ -958,7 +958,7 @@ document.addEventListener('DOMContentLoaded', () => {
             setItemContainer.className = 'set-item';
             const setDetails = document.createElement('span');
             const setTime = set.timestamp instanceof Date ? set.timestamp : new Date(set.timestamp);
-            const formattedTimestamp = `${setTime.toLocaleDateString('en-GB')} ${setTime.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}`;
+            const formattedTimestamp = `${setTime.toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: '2-digit' })} ${setTime.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}`;
             setDetails.textContent = `Set ${index + 1} (${formattedTimestamp}): ${set.weight} kg x ${set.reps} reps`;
             if(set.notes) setDetails.textContent += ` (${set.notes})`;
 
@@ -1303,7 +1303,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 item.className = 'set-item-historical';
                 const datePrefix = document.createElement('span');
                 datePrefix.className = 'date-prefix';
-                datePrefix.textContent = `${new Date(set.sessionDate).toLocaleDateString('en-GB')} (${set.sessionName}) Set @ ${set.timestamp.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}: `;
+                // Assuming set.sessionDate is reliable (YYYY-MM-DD string)
+                // And set.timestamp is a Date object
+                const sessionDisplayDate = new Date(set.sessionDate + 'T00:00:00').toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: '2-digit' });
+                datePrefix.textContent = `${sessionDisplayDate} (${set.sessionName}) Set @ ${set.timestamp.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}: `;
                 item.appendChild(datePrefix);
                 item.append(`${set.weight} kg x ${set.reps} reps`);
                 if (set.notes) item.append(` (${set.notes})`);
@@ -1313,7 +1316,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (set.reps > 0 && set.weight > 0) {
                     const option = document.createElement('option');
                     option.value = JSON.stringify({ weight: set.weight, reps: set.reps });
-                    option.textContent = `${new Date(set.timestamp).toLocaleDateString('en-GB')} ${set.timestamp.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})} - ${set.weight}kg x ${set.reps}reps`;
+                    const optionDateStr = set.timestamp.toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: '2-digit' });
+                    option.textContent = `${optionDateStr} ${set.timestamp.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})} - ${set.weight}kg x ${set.reps}reps`;
                     setFor1RMSelect.appendChild(option);
                 }
             });
@@ -1325,7 +1329,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const chartDataPoints = [...allSetsForExerciseName].sort((a,b) => a.timestamp - b.timestamp); // Use all sets for chart
 
         if (chartDataPoints.length > 0) {
-            const labels = chartDataPoints.map(s => new Date(s.timestamp).toLocaleDateString('en-GB')); // Use consistent date format
+            const labels = chartDataPoints.map(s => s.timestamp.toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: '2-digit' }));
             const weightData = chartDataPoints.map(s => s.weight);
             detailedExerciseChart = new Chart(detailedExerciseChartCanvas, {
                 type: 'line',
@@ -1479,17 +1483,20 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
-        const now = new Date();
-        const year = parseInt(selectedDateStr.substring(0, 4));
-        const month = parseInt(selectedDateStr.substring(5, 7)) - 1; // Month is 0-indexed
-        const day = parseInt(selectedDateStr.substring(8, 10));
+        // const now = new Date(); // Current time's hours/mins/secs are no longer used with midday approach
+        // const year = parseInt(selectedDateStr.substring(0, 4));
+        // const month = parseInt(selectedDateStr.substring(5, 7)) - 1; // Month is 0-indexed
+        // const day = parseInt(selectedDateStr.substring(8, 10));
 
-        console.log("Selected Date String:", selectedDateStr);
-        console.log("Parsed Y/M/D:", year, month, day);
+        console.log("Selected Date String from input:", selectedDateStr);
+        // console.log("Parsed Y/M/D:", year, month, day); // No longer manually parsing
 
-        // Set time to midday in local timezone for the selected date to stabilize date part across UTC conversion
-        const combinedDateTime = new Date(year, month, day, 12, 0, 0, 0);
-        console.log("Combined Local DateTime (midday):", combinedDateTime.toString());
+        // Construct Date object by appending a fixed local time (midday) to the date string.
+        // This makes the browser's date parser handle the YYYY-MM-DD string correctly.
+        // The resulting Date object will be in the local timezone.
+        const combinedDateTime = new Date(selectedDateStr + 'T12:00:00');
+
+        console.log("Combined Local DateTime (midday from string):", combinedDateTime.toString());
 
         newSetData.timestamp = combinedDateTime.toISOString();
         console.log("Timestamp for Supabase (ISO UTC):", newSetData.timestamp);
@@ -1723,11 +1730,15 @@ document.addEventListener('DOMContentLoaded', () => {
             rawDataOutput.textContent = "No data for this exercise."; return;
         }
         rawDataOutput.textContent = JSON.stringify(exerciseDataPoints.map(dp => ({
-            date: dp.timestamp.toLocaleDateString(), time: dp.timestamp.toLocaleTimeString(),
+            date: dp.timestamp.toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: '2-digit' }),
+            time: dp.timestamp.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}),
             weight: dp.weight, reps: dp.reps, volume: dp.volume
         })), null, 2);
 
-        const labels = exerciseDataPoints.map(dp => dp.timestamp.toLocaleDateString() + ' ' + dp.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
+        const labels = exerciseDataPoints.map(dp =>
+            dp.timestamp.toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: '2-digit' }) +
+            ' ' + dp.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+        );
         progressChart = new Chart(progressChartCanvas, {
             type: 'line',
             data: {
@@ -1780,7 +1791,9 @@ document.addEventListener('DOMContentLoaded', () => {
             exerciseDataMap.set(exName, dailyVolumes);
         });
 
-        const sortedUniqueTimestamps = Array.from(allTimestamps).sort((a,b) => a - b).map(ts => new Date(ts).toLocaleDateString());
+        const sortedUniqueTimestamps = Array.from(allTimestamps).sort((a,b) => a - b).map(ts =>
+            new Date(ts).toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: '2-digit' })
+        );
         const colorPalette = ['rgb(255, 99, 132)', 'rgb(54, 162, 235)', 'rgb(255, 206, 86)', 'rgb(75, 192, 192)', 'rgb(153, 102, 255)', 'rgb(255, 159, 64)'];
 
         selectedExerciseNames.forEach((exName, index) => {
