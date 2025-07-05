@@ -128,7 +128,139 @@ export async function loadUserProfile() {
     }
 }
 
-// Placeholder for other API functions to be moved here:
-// e.g., export async function addSession(sessionData) { ... }
-// export async function updateSessionOrder(updates) { ... }
-// ... etc. for all CRUD operations for sessions, exercises, sets, bodyweight, profile settings ...
+// --- Session API Functions ---
+
+export async function addSessionAPI(sessionData) {
+    if (!state.currentUser) throw new Error("User must be logged in to add a session.");
+    const dataToInsert = { ...sessionData, user_id: state.currentUser.id };
+    const { data, error } = await supabaseClient.from('sessions').insert(dataToInsert).select().single();
+    if (error) throw error;
+    return data; // Returns the newly created session object from Supabase
+}
+
+export async function deleteSessionAPI(sessionId) {
+    if (!state.currentUser) throw new Error("User must be logged in to delete a session.");
+    const { error } = await supabaseClient.from('sessions').delete()
+        .eq('id', sessionId)
+        .eq('user_id', state.currentUser.id); // Ensure user owns the session
+    if (error) throw error;
+    // No data returned on successful delete by default
+}
+
+export async function updateSessionNameAPI(sessionId, newName) {
+    if (!state.currentUser) throw new Error("User must be logged in to update a session.");
+    const { error } = await supabaseClient
+        .from('sessions')
+        .update({ name: newName, updated_at: new Date().toISOString() })
+        .eq('id', sessionId)
+        .eq('user_id', state.currentUser.id);
+    if (error) throw error;
+}
+
+export async function updateSessionOrderAPI(sessionUpdates) {
+    // sessionUpdates is expected to be an array of objects like:
+    // [{ id: sessionId1, sort_order: 0, user_id: '...' }, { id: sessionId2, sort_order: 1, user_id: '...' }]
+    // Ensure user_id is part of the update for RLS if policies require it on update.
+    if (!state.currentUser) throw new Error("User must be logged in to update session order.");
+
+    // Add/confirm user_id for each update object if not already present and RLS demands it
+    const updatesWithUserId = sessionUpdates.map(s => ({ ...s, user_id: state.currentUser.id }));
+
+    const { error } = await supabaseClient.from('sessions').upsert(updatesWithUserId, { onConflict: 'id' });
+    if (error) throw error;
+}
+
+
+// --- Exercise API Functions ---
+export async function addExerciseAPI(exerciseData) {
+    if (!state.currentUser) throw new Error("User must be logged in to add an exercise.");
+    // Ensure user_id is included, session_id should be in exerciseData
+    if (!exerciseData.session_id) throw new Error("session_id is required to add an exercise.");
+
+    const dataToInsert = {
+        ...exerciseData,
+        user_id: state.currentUser.id
+    };
+
+    const { data, error } = await supabaseClient.from('exercises').insert(dataToInsert).select().single();
+    if (error) throw error;
+    return data; // Returns the newly created exercise object
+}
+
+export async function updateExerciseNameAPI(exerciseId, newName) {
+    if (!state.currentUser) throw new Error("User must be logged in to update an exercise.");
+    const { error } = await supabaseClient
+        .from('exercises')
+        .update({ name: newName, updated_at: new Date().toISOString() })
+        .eq('id', exerciseId)
+        .eq('user_id', state.currentUser.id); // Ensure user owns the exercise's session indirectly
+    if (error) throw error;
+}
+
+export async function deleteExerciseAPI(exerciseId) {
+    if (!state.currentUser) throw new Error("User must be logged in to delete an exercise.");
+    const { error } = await supabaseClient.from('exercises').delete()
+        .eq('id', exerciseId)
+        .eq('user_id', state.currentUser.id);
+    if (error) throw error;
+}
+
+export async function updateExerciseOrderAPI(exerciseUpdates) {
+    if (!state.currentUser) throw new Error("User must be logged in to update exercise order.");
+    const updatesWithUserId = exerciseUpdates.map(ex => ({ ...ex, user_id: state.currentUser.id }));
+    const { error } = await supabaseClient.from('exercises').upsert(updatesWithUserId, { onConflict: 'id' });
+    if (error) throw error;
+}
+
+// --- Set API Functions ---
+export async function addSetAPI(setData) {
+    if (!state.currentUser) throw new Error("User must be logged in to add a set.");
+    if (!setData.exercise_id) throw new Error("exercise_id is required to add a set.");
+
+    const dataToInsert = {
+        ...setData,
+        user_id: state.currentUser.id
+    };
+    const { data, error } = await supabaseClient.from('sets').insert(dataToInsert).select().single();
+    if (error) throw error;
+    return data; // Returns the newly created set object
+}
+
+export async function deleteSetAPI(setId) {
+    if (!state.currentUser) throw new Error("User must be logged in to delete a set.");
+    const { error } = await supabaseClient.from('sets').delete()
+        .eq('id', setId)
+        .eq('user_id', state.currentUser.id); // Ensure user owns the set indirectly via exercise
+    if (error) throw error;
+}
+
+
+// --- Body Weight API Functions ---
+export async function addBodyWeightLogAPI(logEntryData) {
+    if (!state.currentUser) throw new Error("User must be logged in to log body weight.");
+    const dataToInsert = { ...logEntryData, user_id: state.currentUser.id };
+    const { data, error } = await supabaseClient.from('body_weight_log').insert(dataToInsert).select().single();
+    if (error) throw error;
+    return data;
+}
+
+export async function deleteBodyWeightEntryAPI(entryId) {
+    if (!state.currentUser) throw new Error("User must be logged in to delete a body weight entry.");
+    const { error } = await supabaseClient.from('body_weight_log').delete()
+        .eq('id', entryId)
+        .eq('user_id', state.currentUser.id);
+    if (error) throw error;
+}
+
+export async function updateBodyWeightLogDateAPI(entryId, newDate) {
+    if (!state.currentUser) throw new Error("User must be logged in to update a body weight entry.");
+    const { error } = await supabaseClient
+        .from('body_weight_log')
+        .update({ date: newDate, updated_at: new Date().toISOString() })
+        .eq('id', entryId)
+        .eq('user_id', state.currentUser.id);
+    if (error) throw error;
+}
+
+// --- Profile API Functions (Placeholders) ---
+// ...

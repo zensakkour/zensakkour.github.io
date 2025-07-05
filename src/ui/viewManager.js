@@ -1,21 +1,17 @@
 import * as state from '../state.js';
 import * as dom from '../domElements.js';
-// import { renderSessions, renderExercisesForSession, renderDetailedExerciseView, renderSetsForExercise, renderBodyWeightHistory, populateExerciseSelect, handleAnalysisTypeChange } from './renderingService.js'; // Placeholder for specific render functions
+import { renderSessions } from './sessionView.js'; // Import actual renderSessions
+// import { renderExercisesForSession, renderDetailedExerciseView, renderSetsForExercise } from './exerciseView.js'; // Future imports
+import { renderBodyWeightHistory } from './bodyWeightView.js'; // Import actual
+// import { populateExerciseSelect, handleAnalysisTypeChange } from './analysisView.js'; // Future imports
 
-// Placeholders for rendering functions until they are fully modularized
-// These would ideally be imported from specific UI modules (sessionView.js, exerciseView.js, etc.)
+
+// Placeholders for rendering functions that are not yet moved
 const placeholderRenderer = {
-    renderSessions: () => {
-        console.warn("viewManager calling placeholderRenderer.renderSessions");
-        if(dom.sessionListDiv) dom.sessionListDiv.innerHTML = '<p>Session rendering pending...</p>';
-    },
+    // renderSessions, renderBodyWeightHistory are now imported directly
     renderExercisesForSession: (sessionId) => console.warn(`viewManager calling placeholderRenderer.renderExercisesForSession(${sessionId})`),
     renderDetailedExerciseView: (exerciseName) => console.warn(`viewManager calling placeholderRenderer.renderDetailedExerciseView(${exerciseName})`),
     renderSetsForExercise: (sessionId, exerciseId) => console.warn(`viewManager calling placeholderRenderer.renderSetsForExercise(${sessionId}, ${exerciseId})`),
-    renderBodyWeightHistory: () => {
-        console.warn("viewManager calling placeholderRenderer.renderBodyWeightHistory");
-         if(dom.bodyWeightHistoryDiv) dom.bodyWeightHistoryDiv.innerHTML = '<p>Body weight history rendering pending...</p>';
-    },
     populateExerciseSelect: () => console.warn("viewManager calling placeholderRenderer.populateExerciseSelect"),
     handleAnalysisTypeChange: () => console.warn("viewManager calling placeholderRenderer.handleAnalysisTypeChange"),
 };
@@ -137,16 +133,16 @@ export function setupNavEventListeners() {
             if (targetId === 'sessions') {
                 // If currentView is not already part of sessions, reset to sessionList
                 if (!['sessionList', 'exerciseView', 'detailedExerciseView', 'setTracker'].includes(state.currentView)) {
-                    showSessionListView(); // This also calls renderSessions via placeholders for now
+                    showSessionListView();
                 }
-                placeholderRenderer.renderSessions(); // Explicitly re-render if needed
+                renderSessions(); // Use actual renderSessions
             } else if (targetId === 'analysis') {
                 state.setCurrentView('analysisView'); // Or a more specific view name
                 placeholderRenderer.populateExerciseSelect();
                 placeholderRenderer.handleAnalysisTypeChange();
             } else if (targetId === 'body-weight') {
                 state.setCurrentView('bodyWeightView');
-                placeholderRenderer.renderBodyWeightHistory();
+                renderBodyWeightHistory(); // Use actual
                 if (dom.bodyWeightDateInput) dom.bodyWeightDateInput.valueAsDate = new Date();
             } else if (targetId === 'profile') {
                 state.setCurrentView('profileView');

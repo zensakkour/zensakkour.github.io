@@ -3,24 +3,19 @@ import * as state from './state.js';
 import * as dom from './domElements.js';
 import { showFeedback } from './ui/renderUtils.js';
 import * as viewManager from './ui/viewManager.js'; // Import the actual viewManager
-// import { renderSessions, renderBodyWeightHistory } from './ui/sessionView.js'; // Future imports
+import { renderSessions } from './ui/sessionView.js'; // Import actual renderSessions
+import {
+    renderExercisesForSession,
+    renderDetailedExerciseView,
+    renderSetsForExercise
+} from './ui/exerciseView.js'; // Import actual exercise/set render functions
+import { renderBodyWeightHistory } from './ui/bodyWeightView.js'; // Import actual
 // import { populateExerciseSelect, handleAnalysisTypeChange } from './ui/analysisView.js'; // Future imports
 
 
-// Placeholder for render functions until they are in their own modules
-// These will be replaced by imports from specific UI modules (sessionView.js, exerciseView.js, etc.)
+// Placeholder for render functions that are not yet moved
 const placeholderRenderer = {
-    renderSessions: () => {
-        console.warn("renderSessions not yet implemented");
-        if(dom.sessionListDiv) dom.sessionListDiv.innerHTML = '<p>Session rendering pending...</p>';
-    },
-    renderBodyWeightHistory: () => {
-        console.warn("renderBodyWeightHistory not yet implemented");
-        if(dom.bodyWeightHistoryDiv) dom.bodyWeightHistoryDiv.innerHTML = '<p>Body weight history rendering pending...</p>';
-    },
-    renderExercisesForSession: (sessionId) => console.warn(`renderExercisesForSession(${sessionId}) not yet implemented`),
-    renderDetailedExerciseView: (exerciseName) => console.warn(`renderDetailedExerciseView(${exerciseName}) not yet implemented`),
-    renderSetsForExercise: (sessionId, exerciseId) => console.warn(`renderSetsForExercise(${sessionId}, ${exerciseId}) not yet implemented`),
+    // renderSessions, renderExercisesForSession, renderDetailedExerciseView, renderSetsForExercise, renderBodyWeightHistory are now imported
     populateExerciseSelect: () => console.warn("populateExerciseSelect not yet implemented"),
     handleAnalysisTypeChange: () => console.warn("handleAnalysisTypeChange not yet implemented"),
 };
@@ -46,8 +41,8 @@ async function initializeAppData() {
         }
     } else {
         state.clearAllStateForLogout(); // Clears gymData, currentUser, etc.
-        placeholderRenderer.renderSessions();
-        placeholderRenderer.renderBodyWeightHistory();
+        renderSessions(); // Use actual renderSessions
+        renderBodyWeightHistory(); // Use actual
         state.setAppInitializedOnce(false);
         return;
     }
@@ -82,26 +77,26 @@ async function initializeAppData() {
         } else if (state.currentView === 'exerciseView' && state.currentSessionId) {
             const sessionExists = state.gymData.sessions.some(s => s.id === state.currentSessionId);
             if (sessionExists) {
-                placeholderRenderer.renderExercisesForSession(state.currentSessionId);
-                viewManager.showExerciseView(true); // Use actual viewManager function
+                renderExercisesForSession(state.currentSessionId); // Use actual function
+                viewManager.showExerciseView(true);
             } else {
-                viewManager.showSessionListView(); // Use actual viewManager function
+                viewManager.showSessionListView();
             }
         } else if (state.currentView === 'detailedExerciseView' && state.currentSessionId && state.currentViewingExerciseName) {
             const session = state.gymData.sessions.find(s => s.id === state.currentSessionId);
             const exercise = session ? session.exercises.find(ex => ex.name === state.currentViewingExerciseName) : null;
             if (exercise) {
                 state.setCurrentExerciseId(exercise.id);
-                placeholderRenderer.renderDetailedExerciseView(state.currentViewingExerciseName);
-                viewManager.showDetailedExerciseView(); // Use actual viewManager function
-            } else { viewManager.showSessionListView(); } // Use actual viewManager function
+                renderDetailedExerciseView(state.currentViewingExerciseName); // Use actual function
+                viewManager.showDetailedExerciseView();
+            } else { viewManager.showSessionListView(); }
         } else if (state.currentView === 'setTracker' && state.currentSessionId && state.currentExerciseId) {
             const session = state.gymData.sessions.find(s => s.id === state.currentSessionId);
             const exercise = session ? session.exercises.find(ex => ex.id === state.currentExerciseId) : null;
             if (exercise) {
-                placeholderRenderer.renderSetsForExercise(state.currentSessionId, state.currentExerciseId);
-                viewManager.showSetTracker(); // Use actual viewManager function
-            } else { viewManager.showSessionListView(); } // Use actual viewManager function
+                renderSetsForExercise(state.currentSessionId, state.currentExerciseId); // Use actual function
+                viewManager.showSetTracker();
+            } else { viewManager.showSessionListView(); }
         } else {
             viewManager.showSessionListView(); // Use actual viewManager function
         }
@@ -137,7 +132,7 @@ async function initializeAppData() {
     state.setAppInitializedOnce(true);
 }
 
-function updateUIForAuthState(user) {
+export function updateUIForAuthState(user) { // Made exportable for potential direct use if needed, though primarily internal to auth flow
     console.log("updateUIForAuthState called with user:", user, "currentUser:", state.currentUser, "appInitializedOnce:", state.appInitializedOnce);
     const previousUser = state.currentUser;
     state.setCurrentUser(user);
@@ -174,8 +169,8 @@ function updateUIForAuthState(user) {
         dom.mainContent.style.display = 'none';
 
         state.clearAllStateForLogout();
-        placeholderRenderer.renderSessions();
-        placeholderRenderer.renderBodyWeightHistory();
+        renderSessions(); // Use actual renderSessions
+        renderBodyWeightHistory(); // Use actual
         // Active nav link update would also happen here if needed
     }
 }
