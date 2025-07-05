@@ -1343,13 +1343,14 @@ document.addEventListener('DOMContentLoaded', () => {
                     return match;
                 });
                 console.log("[renderDetailedExerciseView] Length of setsToDisplay after filter:", setsToDisplay.length); // INTENSIVE DEBUG
-                console.log("[renderDetailedExerciseView] Sets after filtering for lastInstance:", JSON.parse(JSON.stringify(setsToDisplay.map(s => ({id: s.id, exercise_id: s.exercise_id, timestamp: s.timestamp}))))); // Log relevant parts
+                // Enhanced log to show session details for filtered sets:
+                console.log("[renderDetailedExerciseView] Sets after filtering for lastInstance (should be single instance/session):", JSON.parse(JSON.stringify(setsToDisplay.map(s => ({set_id: s.id, exercise_instance_id: s.exercise_id, timestamp: s.timestamp, sessionName: s.sessionName, sessionDate: s.sessionDate, weight: s.weight, reps: s.reps})))));
 
                 setsToDisplay.sort((a,b) => a.timestamp - b.timestamp); // Sort oldest first for display
             }
         } else { // 'allHistory'
             console.log("[renderDetailedExerciseView] Setting to display allHistory."); // INTENSIVE DEBUG
-            toggleHistoryViewBtn.textContent = 'Show Last Session Only';
+            toggleHistoryViewBtn.textContent = 'Show Last Instance Only'; // Clarified button text
             setsToDisplay = [...allSetsForExerciseName].sort((a,b) => a.timestamp - b.timestamp); // oldest first for display
             console.log("[renderDetailedExerciseView] Sets for allHistory display (count):", setsToDisplay.length); // INTENSIVE DEBUG
         }
