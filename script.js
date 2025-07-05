@@ -95,7 +95,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let currentUser = null; // Holds user object from Supabase, including profile data after load
     let currentView = 'sessionList'; // To track the current active view for session storage
     let appInitializedOnce = false; // Flag to prevent re-initialization issues
-    let detailedHistoryViewMode = 'lastInstance'; // 'lastInstance' or 'allHistory'
+    let detailedHistoryViewMode = 'lastDay'; // 'lastDay' or 'allHistory'
 
     // --- View State Persistence ---
     function saveViewState() {
@@ -1323,34 +1323,46 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         let setsToDisplay = [];
-        if (detailedHistoryViewMode === 'lastInstance') {
-            console.log("Filtering for lastInstance."); // DEBUG
-            toggleHistoryViewBtn.textContent = 'Show All History';
-            // Identify the specific exercise instance (original exercise_id) of the most recent set
-            const mostRecentSetOverall = allSetsForExerciseName[0];
-            if (!mostRecentSetOverall) {
-                console.error("[renderDetailedExerciseView] No sets found in allSetsForExerciseName for lastInstance logic (this should have been caught earlier).");
+        if (detailedHistoryViewMode === 'lastDay') { // Changed from 'lastInstance'
+            console.log("[renderDetailedExerciseView] Filtering for lastDay."); // DEBUG
+            toggleHistoryViewBtn.textContent = 'Show All History'; // Correct: prompts to switch away from 'lastDay'
+
+            if (allSetsForExerciseName.length === 0) {
+                // This case is already handled before this if/else block,
+                // but as a safeguard or if structure changes:
+                detailedExerciseHistoryListEl.innerHTML = '<p class="empty-state-message">No history found for this exercise.</p>';
                 setsToDisplay = [];
+                // No need to update chart or 1RM here as it's handled by the main empty check
             } else {
-                const lastPerformedExerciseInstanceId = mostRecentSetOverall.exercise_id;
-                console.log("[renderDetailedExerciseView] Target lastPerformedExerciseInstanceId:", lastPerformedExerciseInstanceId); // INTENSIVE DEBUG
-                console.log("[renderDetailedExerciseView] Length of allSetsForExerciseName before filter:", allSetsForExerciseName.length); // INTENSIVE DEBUG
+                const mostRecentSetTimestamp = allSetsForExerciseName[0].timestamp; // Already a Date object
+                // Create a Date object representing midnight (start of day) in the local timezone for the most recent set's day
+                const lastSessionDayDate = new Date(
+                    mostRecentSetTimestamp.getFullYear(),
+                    mostRecentSetTimestamp.getMonth(),
+                    mostRecentSetTimestamp.getDate()
+                );
+                console.log(`[renderDetailedExerciseView] Filtering for sets on last active day: ${lastSessionDayDate.toDateString()}`);
 
                 setsToDisplay = allSetsForExerciseName.filter(s => {
-                    const match = s.exercise_id === lastPerformedExerciseInstanceId;
-                    // INTENSIVE DEBUG - Log each comparison
-                    // console.log(`  [Filter] Set ID: ${s.id}, Set ExID: ${s.exercise_id}, Target ExID: ${lastPerformedExerciseInstanceId}, Match: ${match}`);
-                    return match;
+                    const setTimestamp = s.timestamp; // Already a Date object
+                    // Create a Date object representing midnight for the current set's day
+                    const setDayDate = new Date(
+                        setTimestamp.getFullYear(),
+                        setTimestamp.getMonth(),
+                        setTimestamp.getDate()
+                    );
+                    return setDayDate.getTime() === lastSessionDayDate.getTime();
                 });
-                console.log("[renderDetailedExerciseView] Length of setsToDisplay after filter:", setsToDisplay.length); // INTENSIVE DEBUG
-                // Enhanced log to show session details for filtered sets:
-                console.log("[renderDetailedExerciseView] Sets after filtering for lastInstance (should be single instance/session):", JSON.parse(JSON.stringify(setsToDisplay.map(s => ({set_id: s.id, exercise_instance_id: s.exercise_id, timestamp: s.timestamp, sessionName: s.sessionName, sessionDate: s.sessionDate, weight: s.weight, reps: s.reps})))));
 
-                setsToDisplay.sort((a,b) => a.timestamp - b.timestamp); // Sort oldest first for display
+                console.log(`[renderDetailedExerciseView] Found ${setsToDisplay.length} sets for the last active day.`);
+                console.log("[renderDetailedExerciseView] Sets for 'lastDay' display:", JSON.parse(JSON.stringify(setsToDisplay.map(s => ({set_id: s.id, exercise_instance_id: s.exercise_id, timestamp: s.timestamp.toISOString(), sessionName: s.sessionName, sessionDate: s.sessionDate, weight: s.weight, reps: s.reps})))));
+
+                // Sort the sets for the last day chronologically for display
+                setsToDisplay.sort((a, b) => a.timestamp - b.timestamp);
             }
         } else { // 'allHistory'
             console.log("[renderDetailedExerciseView] Setting to display allHistory."); // INTENSIVE DEBUG
-            toggleHistoryViewBtn.textContent = 'Show Last Instance Only'; // Clarified button text
+            toggleHistoryViewBtn.textContent = "Show Last Day's Sets"; // Updated text
             setsToDisplay = [...allSetsForExerciseName].sort((a,b) => a.timestamp - b.timestamp); // oldest first for display
             console.log("[renderDetailedExerciseView] Sets for allHistory display (count):", setsToDisplay.length); // INTENSIVE DEBUG
         }
@@ -2194,10 +2206,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
     if (toggleHistoryViewBtn) {
         toggleHistoryViewBtn.addEventListener('click', () => {
-            if (detailedHistoryViewMode === 'lastInstance') {
+            if (detailedHistoryViewMode === 'lastDay') { // Changed from 'lastInstance'
                 detailedHistoryViewMode = 'allHistory';
-            } else {
-                detailedHistoryViewMode = 'lastInstance';
+            } else { // Was 'allHistory', so switch to 'lastDay'
+                detailedHistoryViewMode = 'lastDay'; // Changed from 'lastInstance'
             }
             console.log("[ToggleBtn] Toggled detailedHistoryViewMode to:", detailedHistoryViewMode); // INTENSIVE DEBUG
             if (currentViewingExerciseName) { // Ensure there's an exercise context
