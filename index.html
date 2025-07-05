@@ -201,6 +201,7 @@
     </footer>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="script.js"></script>
+    {_} <!-- Ensure Supabase client is available globally before app.js runs if app.js expects it that way -->
+    <script type="module" src="src/app.js"></script>
 </body>
 </html>
