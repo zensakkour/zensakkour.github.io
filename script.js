@@ -73,11 +73,19 @@ document.addEventListener('DOMContentLoaded', () => {
     const setFor1RMSelect = document.getElementById('set-for-1rm-select');
     const calculate1RMBtn = document.getElementById('calculate-1rm-btn');
     const calculated1RMResultEl = document.getElementById('calculated-1rm-result');
+    const toggleHistoryViewBtn = document.getElementById('toggle-history-view-btn');
 
     // Profile section DOM elements
     const profileUsernameInput = document.getElementById('profile-username');
     const saveProfileBtn = document.getElementById('save-profile-btn');
     const profileFeedbackDiv = document.getElementById('profile-feedback');
+    const newPasswordInput = document.getElementById('profile-new-password');
+    const confirmPasswordInput = document.getElementById('profile-confirm-password');
+    const changePasswordBtn = document.getElementById('change-password-btn');
+    const passwordFeedbackDiv = document.getElementById('password-feedback');
+    const newEmailInput = document.getElementById('profile-new-email');
+    const changeEmailBtn = document.getElementById('change-email-btn');
+    const emailFeedbackDiv = document.getElementById('email-feedback');
 
 
     let currentSessionId = null;
@@ -86,6 +94,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let currentUser = null; // Holds user object from Supabase, including profile data after load
     let currentView = 'sessionList'; // To track the current active view for session storage
     let appInitializedOnce = false; // Flag to prevent re-initialization issues
+    let detailedHistoryViewMode = 'lastInstance'; // 'lastInstance' or 'allHistory'
 
     // --- View State Persistence ---
     function saveViewState() {
@@ -224,21 +233,44 @@ document.addEventListener('DOMContentLoaded', () => {
             bodyWeightHistoryDiv.innerHTML = '<p class="empty-state-message">No body weight entries yet. Add one above.</p>';
             return;
         }
-        const sortedLog = [...gymData.bodyWeightLog].sort((a, b) => new Date(b.date) - new Date(a.date));
+        const sortedLog = [...gymData.bodyWeightLog].sort((a, b) => new Date(b.date + 'T00:00:00') - new Date(a.date + 'T00:00:00'));
         const list = document.createElement('ul');
         list.className = 'styled-list';
         sortedLog.forEach(entry => {
             const listItem = document.createElement('li');
             listItem.className = 'list-item body-weight-item';
+
+            // Store original text content structure if needed, or just the parts
+            const originalDateStr = new Date(entry.date + 'T00:00:00').toLocaleDateString('en-GB');
+            const originalWeight = entry.weight;
+
             const textSpan = document.createElement('span');
-            textSpan.textContent = `${new Date(entry.date).toLocaleDateString()} - ${entry.weight} kg`;
+            textSpan.className = 'bw-details-span'; // Class to easily find it
+            textSpan.textContent = `${originalDateStr} - ${originalWeight} kg`;
             listItem.appendChild(textSpan);
+
             const deleteBtn = document.createElement('button');
             deleteBtn.innerHTML = '&times;';
             deleteBtn.className = 'delete-btn button-danger';
-            deleteBtn.title = `Delete entry: ${new Date(entry.date).toLocaleDateString()}`;
-            deleteBtn.onclick = () => deleteBodyWeightEntry(entry.id); // Will be updated for Supabase
-            listItem.appendChild(deleteBtn);
+            deleteBtn.title = `Delete entry: ${new Date(entry.date + 'T00:00:00').toLocaleDateString('en-GB')}`; // Use en-GB for DD/MM/YYYY
+            deleteBtn.onclick = () => deleteBodyWeightEntry(entry.id);
+
+            const editBtn = document.createElement('button');
+            editBtn.innerHTML = '&#9998;'; // Pencil icon
+            editBtn.className = 'edit-bw-date-btn button-secondary button-small';
+            editBtn.title = `Edit date for entry on ${new Date(entry.date + 'T00:00:00').toLocaleDateString('en-GB')}`;
+            editBtn.style.marginLeft = '5px';
+            editBtn.onclick = (e) => {
+                e.stopPropagation();
+                showBodyWeightDateEditUI(listItem, entry);
+            };
+
+            const buttonGroup = document.createElement('div');
+            buttonGroup.className = 'bw-item-actions';
+            buttonGroup.appendChild(editBtn);
+            buttonGroup.appendChild(deleteBtn);
+            listItem.appendChild(buttonGroup);
+
             list.appendChild(listItem);
         });
         bodyWeightHistoryDiv.appendChild(list);
@@ -257,8 +289,8 @@ document.addEventListener('DOMContentLoaded', () => {
             });
             return;
         }
-        const sortedLog = [...gymData.bodyWeightLog].sort((a, b) => new Date(a.date) - new Date(b.date));
-        const labels = sortedLog.map(entry => new Date(entry.date).toLocaleDateString());
+        const sortedLog = [...gymData.bodyWeightLog].sort((a, b) => new Date(a.date + 'T00:00:00') - new Date(b.date + 'T00:00:00'));
+        const labels = sortedLog.map(entry => new Date(entry.date + 'T00:00:00').toLocaleDateString('en-GB')); // Use DD/MM/YYYY
         const weightData = sortedLog.map(entry => entry.weight);
         rawDataOutput.textContent = JSON.stringify(sortedLog.map(e => ({date: e.date, weight: e.weight})), null, 2);
         progressChart = new Chart(progressChartCanvas, {
@@ -281,6 +313,47 @@ document.addEventListener('DOMContentLoaded', () => {
                     tooltip: { titleColor: '#fff', bodyColor: '#ddd', backgroundColor: 'rgba(0,0,0,0.8)' },
                     title: { display: true, text: 'Body Weight Over Time', color: '#f4f4f4', font: {size: 16}}
                 }
+            }
+        });
+    }
+
+    if (changeEmailBtn) {
+        changeEmailBtn.addEventListener('click', async () => {
+            const newEmail = newEmailInput.value.trim();
+            emailFeedbackDiv.style.display = 'none'; // Clear previous feedback
+
+            if (!newEmail) {
+                showFeedback("Please enter the new email address.", true, emailFeedbackDiv);
+                return;
+            }
+            // Basic email validation regex
+            const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+            if (!emailPattern.test(newEmail)) {
+                showFeedback("Please enter a valid email address.", true, emailFeedbackDiv);
+                return;
+            }
+            if (currentUser && newEmail === currentUser.email) {
+                showFeedback("The new email address is the same as your current one.", true, emailFeedbackDiv);
+                return;
+            }
+
+            showFeedback("Requesting email change...", false, emailFeedbackDiv);
+            try {
+                const { data, error } = await supabaseClient.auth.updateUser({ email: newEmail });
+                if (error) throw error;
+
+                // data for updateUser when changing email is often null or just contains the user,
+                // the important part is the side effect of sending emails.
+                showFeedback(
+                    "Email change request initiated. Please check your OLD email address to confirm this change, " +
+                    "and then check your NEW email address to verify it. Your email will update after verification.",
+                    false,
+                    emailFeedbackDiv
+                );
+                newEmailInput.value = '';
+            } catch (error) {
+                console.error("Error requesting email change:", error);
+                showFeedback(`Error: ${error.message}`, true, emailFeedbackDiv);
             }
         });
     }
@@ -883,7 +956,9 @@ document.addEventListener('DOMContentLoaded', () => {
             const setItemContainer = document.createElement('div');
             setItemContainer.className = 'set-item';
             const setDetails = document.createElement('span');
-            setDetails.textContent = `Set ${index + 1}: ${set.weight} kg x ${set.reps} reps`;
+            const setTime = set.timestamp instanceof Date ? set.timestamp : new Date(set.timestamp);
+            const formattedTimestamp = `${setTime.toLocaleDateString('en-GB')} ${setTime.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}`;
+            setDetails.textContent = `Set ${index + 1} (${formattedTimestamp}): ${set.weight} kg x ${set.reps} reps`;
             if(set.notes) setDetails.textContent += ` (${set.notes})`;
 
             const deleteBtn = document.createElement('button');
@@ -891,18 +966,213 @@ document.addEventListener('DOMContentLoaded', () => {
             deleteBtn.className = 'delete-btn button-danger';
             deleteBtn.title = `Delete Set ${index + 1}`;
             deleteBtn.addEventListener('click', () => {
-                deleteSet(sessionId, exerciseId, set.id); // Will be updated for Supabase
+                deleteSet(sessionId, exerciseId, set.id);
             });
+
+            const editDateBtn = document.createElement('button');
+            editDateBtn.innerHTML = '&#9998;'; // Pencil icon for edit
+            editDateBtn.className = 'edit-set-date-btn button-secondary button-small';
+            editDateBtn.title = `Edit Date/Time for Set ${index + 1}`;
+            editDateBtn.style.marginLeft = "5px";
+            editDateBtn.addEventListener('click', (e) => {
+                e.stopPropagation(); // Prevent any parent handlers
+                // Pass the container, the set object, and context IDs
+                showSetTimestampEditUI(setItemContainer, set, sessionId, exerciseId);
+            });
+
+            const buttonGroup = document.createElement('div');
+            buttonGroup.className = 'set-item-actions'; // For styling if needed
+            buttonGroup.appendChild(editDateBtn);
+            buttonGroup.appendChild(deleteBtn);
+
             setItemContainer.appendChild(setDetails);
-            setItemContainer.appendChild(deleteBtn);
+            setItemContainer.appendChild(buttonGroup);
             setsListDiv.appendChild(setItemContainer);
         });
-        const lastSet = sortedSets[sortedSets.length - 1];
-        setWeightInput.placeholder = `Last: ${lastSet.weight} kg`;
-        setRepsInput.placeholder = `Last: ${lastSet.reps} reps`;
+        // Placeholders are handled by findLastPerformedSetDetails earlier in the function
+        // const lastSet = sortedSetsCurrentInstance[sortedSetsCurrentInstance.length - 1];
+        // setWeightInput.placeholder = `Last: ${lastSet.weight} kg`;
+        // setRepsInput.placeholder = `Last: ${lastSet.reps} reps`;
         // setWeightInput.value = lastSet.weight; // Optionally prefill for editing
         // setRepsInput.value = lastSet.reps;
     }
+
+    // --- Edit Body Weight Date Logic ---
+    function showBodyWeightDateEditUI(entryItemContainer, entry) {
+        const detailsSpan = entryItemContainer.querySelector('.bw-details-span');
+        const actionsDiv = entryItemContainer.querySelector('.bw-item-actions');
+        if (detailsSpan) detailsSpan.style.display = 'none';
+        if (actionsDiv) actionsDiv.style.display = 'none';
+
+        const input = document.createElement('input');
+        input.type = 'date';
+        input.value = entry.date; // Supabase stores date as YYYY-MM-DD, compatible with input type="date"
+        input.className = 'edit-bw-date-input';
+        input.style.marginRight = '5px';
+
+        const saveBtn = document.createElement('button');
+        saveBtn.textContent = 'Save';
+        saveBtn.className = 'button-primary button-small';
+        saveBtn.onclick = async () => {
+            await saveBodyWeightLogDate(entry.id, input.value);
+        };
+
+        const cancelBtn = document.createElement('button');
+        cancelBtn.textContent = 'Cancel';
+        cancelBtn.className = 'button-secondary button-small';
+        cancelBtn.style.marginLeft = '5px';
+        cancelBtn.onclick = () => {
+            if (detailsSpan) detailsSpan.style.display = '';
+            if (actionsDiv) actionsDiv.style.display = '';
+            input.remove();
+            saveBtn.remove();
+            cancelBtn.remove();
+        };
+
+        entryItemContainer.appendChild(input);
+        entryItemContainer.appendChild(saveBtn);
+        entryItemContainer.appendChild(cancelBtn);
+        input.focus();
+    }
+
+    async function saveBodyWeightLogDate(entryId, newDateString) {
+        if (!currentUser) { showFeedback("You must be logged in.", true); return; }
+        if (!newDateString) {
+            showFeedback("Date cannot be empty.", true);
+            renderBodyWeightHistory(); // Refresh to clear bad state
+            return;
+        }
+        // Optional: Further validation if newDateString is a valid date format, though input type="date" helps.
+
+        showFeedback("Updating body weight entry date...", false);
+        try {
+            const { error } = await supabaseClient
+                .from('body_weight_log')
+                .update({ date: newDateString, updated_at: new Date().toISOString() })
+                .eq('id', entryId)
+                .eq('user_id', currentUser.id);
+
+            if (error) throw error;
+
+            // Update local gymData
+            const entry = gymData.bodyWeightLog.find(e => e.id === entryId);
+            if (entry) {
+                entry.date = newDateString;
+            }
+            showFeedback("Body weight entry date updated!", false);
+        } catch (error) {
+            console.error("Error updating body weight entry date:", error);
+            showFeedback(`Error: ${error.message}`, true);
+        } finally {
+            renderBodyWeightHistory(); // Refresh the list
+        }
+    }
+
+
+    function formatDateTimeForInput(date) {
+        if (!(date instanceof Date)) {
+            date = new Date(date); // Try to convert if it's a string
+        }
+        if (isNaN(date.getTime())) { // Invalid date
+            console.error("Invalid date provided to formatDateTimeForInput:", date);
+            // Return a value that won't break the input, or handle error appropriately
+            const now = new Date();
+            return `${now.getFullYear()}-${(now.getMonth() + 1).toString().padStart(2, '0')}-${now.getDate().toString().padStart(2, '0')}T${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
+        }
+        const year = date.getFullYear();
+        const month = (date.getMonth() + 1).toString().padStart(2, '0');
+        const day = date.getDate().toString().padStart(2, '0');
+        const hours = date.getHours().toString().padStart(2, '0');
+        const minutes = date.getMinutes().toString().padStart(2, '0');
+        return `${year}-${month}-${day}T${hours}:${minutes}`;
+    }
+
+    function showSetTimestampEditUI(setItemContainer, set, sessionId, exerciseId) {
+        // Hide existing content (setDetails span and the button group)
+        const setDetailsSpan = setItemContainer.querySelector('span'); // Assuming first span is details
+        const actionsDiv = setItemContainer.querySelector('.set-item-actions');
+        if (setDetailsSpan) setDetailsSpan.style.display = 'none';
+        if (actionsDiv) actionsDiv.style.display = 'none';
+
+        const currentTimestamp = set.timestamp instanceof Date ? set.timestamp : new Date(set.timestamp);
+
+        const input = document.createElement('input');
+        input.type = 'datetime-local';
+        input.value = formatDateTimeForInput(currentTimestamp);
+        input.className = 'edit-timestamp-input';
+        input.style.marginRight = '5px';
+
+        const saveBtn = document.createElement('button');
+        saveBtn.textContent = 'Save';
+        saveBtn.className = 'button-primary button-small';
+        saveBtn.onclick = async () => {
+            const newTimestampISO = new Date(input.value).toISOString();
+            await saveSetTimestamp(sessionId, exerciseId, set.id, newTimestampISO);
+            // UI will be refreshed by renderSetsForExercise called in saveSetTimestamp
+        };
+
+        const cancelBtn = document.createElement('button');
+        cancelBtn.textContent = 'Cancel';
+        cancelBtn.className = 'button-secondary button-small';
+        cancelBtn.style.marginLeft = '5px';
+        cancelBtn.onclick = () => {
+            // Simply re-render to cancel: remove input and show original
+            if (setDetailsSpan) setDetailsSpan.style.display = '';
+            if (actionsDiv) actionsDiv.style.display = '';
+            input.remove();
+            saveBtn.remove();
+            cancelBtn.remove();
+            // Or call renderSetsForExercise(sessionId, exerciseId); for a cleaner full refresh
+        };
+
+        // Append new elements for editing
+        setItemContainer.appendChild(input);
+        setItemContainer.appendChild(saveBtn);
+        setItemContainer.appendChild(cancelBtn);
+        input.focus();
+    }
+
+    async function saveSetTimestamp(sessionId, exerciseId, setId, newTimestampISO) {
+        if (!currentUser) { showFeedback("You must be logged in.", true); return; }
+
+        // Validate newTimestampISO if necessary (e.g., ensure it's a valid date string)
+        if (!newTimestampISO || isNaN(new Date(newTimestampISO).getTime())) {
+            showFeedback("Invalid date/time selected.", true);
+            renderSetsForExercise(sessionId, exerciseId); // Refresh to clear bad input state
+            return;
+        }
+
+        showFeedback("Updating set timestamp...", false);
+        try {
+            const { error } = await supabaseClient
+                .from('sets')
+                .update({ timestamp: newTimestampISO, updated_at: new Date().toISOString() })
+                .eq('id', setId)
+                .eq('user_id', currentUser.id); // Ensure user owns the set
+
+            if (error) throw error;
+
+            // Update local gymData
+            const session = gymData.sessions.find(s => s.id === sessionId);
+            if (session) {
+                const exercise = session.exercises.find(ex => ex.id === exerciseId);
+                if (exercise) {
+                    const setObj = exercise.sets.find(s => s.id === setId);
+                    if (setObj) {
+                        setObj.timestamp = new Date(newTimestampISO); // Update with Date object
+                    }
+                }
+            }
+            showFeedback("Set timestamp updated!", false);
+        } catch (error) {
+            console.error("Error updating set timestamp:", error);
+            showFeedback(`Error: ${error.message}`, true);
+        } finally {
+            renderSetsForExercise(sessionId, exerciseId); // Refresh the list
+        }
+    }
+    // No explicit cancelSetTimestampEdit function needed if re-rendering is the cancel action
+
 
     // --- UI Navigation Functions ---
     function showSessionListView(isRestoring = false) {
@@ -1075,42 +1345,49 @@ document.addEventListener('DOMContentLoaded', () => {
             detailedExerciseHistoryListEl.innerHTML = '<p class="empty-state-message">No history found for this exercise.</p>';
             document.getElementById('detailed-exercise-chart-container').style.display = 'none';
             if (detailedExerciseChart) detailedExerciseChart.destroy();
+            toggleHistoryViewBtn.textContent = 'Show All History'; // Reset button
+            detailedHistoryViewMode = 'lastInstance'; // Reset mode
             return;
         }
 
-        // Identify the specific exercise instance (original exercise_id) of the most recent set
-        const mostRecentSetOverall = allSetsForExerciseName[0];
-        const lastPerformedExerciseInstanceId = mostRecentSetOverall.exercise_id; // This is the key
+        let setsToDisplay = [];
+        if (detailedHistoryViewMode === 'lastInstance') {
+            toggleHistoryViewBtn.textContent = 'Show All History';
+            // Identify the specific exercise instance (original exercise_id) of the most recent set
+            const mostRecentSetOverall = allSetsForExerciseName[0];
+            const lastPerformedExerciseInstanceId = mostRecentSetOverall.exercise_id;
 
-        // Filter to get all sets belonging to that last performed exercise instance
-        const setsFromLastPerformanceInstance = allSetsForExerciseName.filter(
-            s => s.exercise_id === lastPerformedExerciseInstanceId
-        );
+            // Filter to get all sets belonging to that last performed exercise instance
+            setsToDisplay = allSetsForExerciseName.filter(
+                s => s.exercise_id === lastPerformedExerciseInstanceId
+            );
+            // Sort these sets by their actual recorded timestamp for display order (oldest to newest for that instance)
+            setsToDisplay.sort((a,b) => a.timestamp - b.timestamp);
+        } else { // 'allHistory'
+            toggleHistoryViewBtn.textContent = 'Show Last Session Only';
+            setsToDisplay = [...allSetsForExerciseName].sort((a,b) => a.timestamp - b.timestamp); // oldest first for display
+        }
 
-        // Sort these sets by their actual recorded timestamp for display order (oldest to newest for that instance)
-        setsFromLastPerformanceInstance.sort((a,b) => a.timestamp - b.timestamp);
 
-        if (setsFromLastPerformanceInstance.length === 0) { // Should not happen if allSetsForExerciseName was not empty
-            detailedExerciseHistoryListEl.innerHTML = '<p class="empty-state-message">No sets found for the last performance.</p>';
+        if (setsToDisplay.length === 0) {
+            detailedExerciseHistoryListEl.innerHTML = `<p class="empty-state-message">No sets found for this view (${detailedHistoryViewMode}).</p>`;
         } else {
-            setsFromLastPerformanceInstance.forEach(set => {
+            setsToDisplay.forEach(set => {
                 const item = document.createElement('div');
                 item.className = 'set-item-historical';
                 const datePrefix = document.createElement('span');
                 datePrefix.className = 'date-prefix';
-                // Display the session date and name for clarity for this specific instance
-                datePrefix.textContent = `${new Date(set.sessionDate).toLocaleDateString()} (${set.sessionName}): `;
+                datePrefix.textContent = `${new Date(set.sessionDate).toLocaleDateString('en-GB')} (${set.sessionName}) Set @ ${set.timestamp.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}: `;
                 item.appendChild(datePrefix);
                 item.append(`${set.weight} kg x ${set.reps} reps`);
                 if (set.notes) item.append(` (${set.notes})`);
                 detailedExerciseHistoryListEl.appendChild(item);
 
-                // Populate 1RM calculator only with sets from this last performance instance
+                // Populate 1RM calculator with sets from the current view (setsToDisplay)
                 if (set.reps > 0 && set.weight > 0) {
                     const option = document.createElement('option');
                     option.value = JSON.stringify({ weight: set.weight, reps: set.reps });
-                    // Use set's own timestamp for the option text for precision
-                    option.textContent = `${new Date(set.timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})} - ${set.weight}kg x ${set.reps}reps`;
+                    option.textContent = `${new Date(set.timestamp).toLocaleDateString('en-GB')} ${set.timestamp.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})} - ${set.weight}kg x ${set.reps}reps`;
                     setFor1RMSelect.appendChild(option);
                 }
             });
@@ -1119,10 +1396,10 @@ document.addEventListener('DOMContentLoaded', () => {
         // Chart should still show all historical data for the exercise NAME for trend analysis
         if (detailedExerciseChart) detailedExerciseChart.destroy();
         // allSetsForExerciseName is already sorted with most recent first, for chart sort oldest first
-        const chartDataPoints = [...allSetsForExerciseName].sort((a,b) => a.timestamp - b.timestamp);
+        const chartDataPoints = [...allSetsForExerciseName].sort((a,b) => a.timestamp - b.timestamp); // Use all sets for chart
 
         if (chartDataPoints.length > 0) {
-            const labels = chartDataPoints.map(s => new Date(s.timestamp).toLocaleDateString());
+            const labels = chartDataPoints.map(s => new Date(s.timestamp).toLocaleDateString('en-GB')); // Use consistent date format
             const weightData = chartDataPoints.map(s => s.weight);
             detailedExerciseChart = new Chart(detailedExerciseChartCanvas, {
                 type: 'line',
@@ -1845,6 +2122,52 @@ document.addEventListener('DOMContentLoaded', () => {
         // updateUIForAuthState will call initializeAppData if it's a login or initial session.
         updateUIForAuthState(user);
     });
+
+    if (toggleHistoryViewBtn) {
+        toggleHistoryViewBtn.addEventListener('click', () => {
+            if (detailedHistoryViewMode === 'lastInstance') {
+                detailedHistoryViewMode = 'allHistory';
+            } else {
+                detailedHistoryViewMode = 'lastInstance';
+            }
+            if (currentViewingExerciseName) { // Ensure there's an exercise context
+                renderDetailedExerciseView(currentViewingExerciseName);
+            }
+        });
+    }
+
+    if (changePasswordBtn) {
+        changePasswordBtn.addEventListener('click', async () => {
+            const newPassword = newPasswordInput.value;
+            const confirmPassword = confirmPasswordInput.value;
+            passwordFeedbackDiv.style.display = 'none'; // Clear previous feedback
+
+            if (!newPassword || !confirmPassword) {
+                showFeedback("Please fill in both password fields.", true, passwordFeedbackDiv);
+                return;
+            }
+            if (newPassword.length < 6) {
+                showFeedback("New password must be at least 6 characters long.", true, passwordFeedbackDiv);
+                return;
+            }
+            if (newPassword !== confirmPassword) {
+                showFeedback("New passwords do not match.", true, passwordFeedbackDiv);
+                return;
+            }
+
+            showFeedback("Changing password...", false, passwordFeedbackDiv);
+            try {
+                const { error } = await supabaseClient.auth.updateUser({ password: newPassword });
+                if (error) throw error;
+                showFeedback("Password updated successfully!", false, passwordFeedbackDiv);
+                newPasswordInput.value = '';
+                confirmPasswordInput.value = '';
+            } catch (error) {
+                console.error("Error changing password:", error);
+                showFeedback(`Error changing password: ${error.message}`, true, passwordFeedbackDiv);
+            }
+        });
+    }
 
     showSignupLink.addEventListener('click', (e) => {
         e.preventDefault();
