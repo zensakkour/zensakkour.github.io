@@ -172,6 +172,7 @@ export function updateUIForAuthState(user) { // Made exportable for potential di
 
 
 export function initializeAuth() {
+    console.log("[auth.js] initializeAuth called"); // Step 1 Logging
     // Set up the listener for authentication state changes
     supabaseClient.auth.onAuthStateChange(async (event, session) => {
         console.log(`onAuthStateChange event: ${event}`, session);
@@ -192,6 +193,29 @@ export function initializeAuth() {
     // });
 
     // Setup event listeners for auth forms
+    console.log("[auth.js] Checking dom.loginForm before adding listener:", dom.loginForm); // Step 2 Logging
+    if (dom.loginForm) {
+        dom.loginForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            console.log("[auth.js] Login form submitted."); // Step 3 Logging (will move this log later)
+            const email = dom.loginForm.querySelector('#login-email').value;
+            const password = dom.loginForm.querySelector('#login-password').value;
+            showFeedback("Logging in...", false);
+            try {
+                const { error } = await supabaseClient.auth.signInWithPassword({ email, password });
+                if (error) throw error;
+                showFeedback(`Login successful! Welcome back.`, false);
+                dom.loginForm.querySelector('#login-email').value = '';
+                dom.loginForm.querySelector('#login-password').value = '';
+            } catch (error) {
+                console.error('Login error:', error);
+                showFeedback(`Login failed: ${error.message}`, true);
+            }
+        });
+    } else {
+        console.error("[auth.js] dom.loginForm is null or undefined. Cannot attach submit listener.");
+    }
+
     if (dom.signupForm) {
         // Dynamically create and append "Back to Login" link for signup form
         // This ensures it's only added once and handled within this module
