@@ -1,43 +1,12 @@
 import * as state from '../state.js';
 import * as dom from '../domElements.js';
-import { supabaseClient, loadData } from '../api.js'; // Assuming addSession, deleteSession, updateSession will be in api.js
+import { loadData, addSessionAPI, deleteSessionAPI, updateSessionNameAPI, updateSessionOrderAPI } from '../api.js';
 import { showFeedback } from './renderUtils.js';
 import * as viewManager from './viewManager.js'; // For navigation like showExerciseView
-// import { renderExercisesForSession } from './exerciseView.js'; // Will be needed when navigating
+import { renderExercisesForSession } from './exerciseView.js'; // Import actual function
 
-// Placeholder for exerciseView.renderExercisesForSession
-const placeholderExerciseView = {
-    renderExercisesForSession: (sessionId) => console.warn(`sessionView calling placeholderExerciseView.renderExercisesForSession(${sessionId})`)
-};
-// Placeholder for api functions not yet moved
-const placeholderApi = {
-    addSession: async (newSessionData) => {
-        console.warn("placeholderApi.addSession called with:", newSessionData);
-        // Simulate Supabase insert
-        const { data, error } = await supabaseClient.from('sessions').insert(newSessionData).select().single();
-        if (error) throw error;
-        return data;
-    },
-    deleteSession: async (sessionIdToDelete) => {
-        console.warn("placeholderApi.deleteSession called for ID:", sessionIdToDelete);
-        const { error } = await supabaseClient.from('sessions').delete().eq('id', sessionIdToDelete).eq('user_id', state.currentUser.id);
-        if (error) throw error;
-    },
-    updateSessionName: async (sessionId, newName) => {
-        console.warn("placeholderApi.updateSessionName called for ID:", sessionId, "New Name:", newName);
-        const { error } = await supabaseClient
-            .from('sessions')
-            .update({ name: newName, updated_at: new Date().toISOString() })
-            .eq('id', sessionId)
-            .eq('user_id', state.currentUser.id);
-        if (error) throw error;
-    },
-    updateSessionOrder: async (updates) => {
-        console.warn("placeholderApi.updateSessionOrder called with:", updates);
-        const { error } = await supabaseClient.from('sessions').upsert(updates, { onConflict: 'id' });
-        if (error) throw error;
-    }
-};
+// No more placeholderApi for session functions
+// No more placeholderExerciseView
 
 
 // --- Rename Session Logic ---
@@ -110,8 +79,7 @@ async function saveSessionName(sessionId, inputElement, sessionItemContainer, se
 
     showFeedback("Saving new session name...", false);
     try {
-        // await updateSessionName(sessionId, newName); // This will be from api.js
-        await placeholderApi.updateSessionName(sessionId, newName);
+        await updateSessionNameAPI(sessionId, newName); // Use actual API function
 
         session.name = newName; // Update local data
         showFeedback("Session name updated!", false);
@@ -189,8 +157,7 @@ async function handleDropSession(e) {
     }));
 
     try {
-        // await updateSessionOrder(updates); // from api.js
-        await placeholderApi.updateSessionOrder(updates);
+        await updateSessionOrderAPI(updates); // Use actual API function
         console.log("Sessions reordered and saved.");
         renderSessions();
     } catch (error) {
@@ -231,8 +198,7 @@ export function renderSessions() {
         button.addEventListener('click', (e) => {
             if (e.target.closest('.delete-btn') || e.target.closest('.rename-btn')) return;
             state.setCurrentSessionId(session.id);
-            // renderExercisesForSession(session.id); // This will be from exerciseView.js
-            placeholderExerciseView.renderExercisesForSession(session.id);
+            renderExercisesForSession(session.id); // Call imported function
             viewManager.showExerciseView();
         });
 
@@ -245,8 +211,7 @@ export function renderSessions() {
             if (confirm("Are you sure you want to delete this session and all its data? This action cannot be undone.")) {
                 showFeedback("Deleting session...", false);
                 try {
-                    // await deleteSessionAPI(session.id); // from api.js
-                    await placeholderApi.deleteSession(session.id);
+                    await deleteSessionAPI(session.id); // Use actual API function
                     state.gymData.sessions = state.gymData.sessions.filter(s => s.id !== session.id);
                     renderSessions();
                     if (state.currentSessionId === session.id) {
@@ -308,8 +273,7 @@ export function setupSessionEventListeners() {
                 };
                 showFeedback("Adding session...", false);
                 try {
-                    // const newSession = await addSessionAPI(newSessionData); // from api.js
-                    const newSession = await placeholderApi.addSession(newSessionData);
+                    const newSession = await addSessionAPI(newSessionData); // Use actual API function
                     const newSessionWithExercises = {...newSession, exercises: []};
                     state.gymData.sessions.push(newSessionWithExercises);
                     dom.newSessionNameInput.value = '';

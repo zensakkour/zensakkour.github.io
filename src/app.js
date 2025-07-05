@@ -1,8 +1,12 @@
 // Main application entry point
 import { supabaseClient } from './api.js'; // Import the initialized Supabase client
-import { initializeAuth } from './auth.js'; // Placeholder for auth.js
-// import { setupNavEventListeners } from './ui/viewManager.js'; // Example, will be added later
-// import { loadInitialData } from './someDataModule.js'; // Example
+import { initializeAuth } from './auth.js';
+import { setupSessionEventListeners } from './ui/sessionView.js';
+import { setupExerciseEventListeners } from './ui/exerciseView.js';
+import { setupBodyWeightEventListeners } from './ui/bodyWeightView.js'; // Import actual
+// import { setupAnalysisEventListeners } from './ui/analysisView.js'; // Future
+// import { setupProfileEventListeners } from './ui/profileView.js'; // Future
+
 
 console.log("app.js loaded");
 
@@ -10,13 +14,17 @@ document.addEventListener('DOMContentLoaded', () => {
     console.log("DOM fully loaded and parsed. Initializing app...");
 
     // Initialize authentication. This will set up onAuthStateChange listener.
-    initializeAuth(supabaseClient); // Pass the client if auth.js needs it directly
+    initializeAuth(); // supabaseClient is imported directly in auth.js now
 
-    // Example: Setup main navigation event listeners (will be moved to viewManager later)
-    // setupNavEventListeners();
+    // Setup global event listeners for different views/components
+    // Note: viewManager.setupNavEventListeners() is called from within initializeAppData in auth.js
+    setupSessionEventListeners();
+    setupExerciseEventListeners();
+    setupBodyWeightEventListeners(); // Call actual
+    // setupAnalysisEventListeners(); // Future
+    // setupProfileEventListeners(); // Future
 
-    // Other initializations can go here
-    // e.g., if not handled by onAuthStateChange, might try to load some initial view or data
+    // Other initializations can go here if needed
     // For this app, most UI setup is dependent on auth state.
 });
 
