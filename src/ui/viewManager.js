@@ -3,18 +3,12 @@ import * as dom from '../domElements.js';
 import { renderSessions } from './sessionView.js'; // Import actual renderSessions
 // import { renderExercisesForSession, renderDetailedExerciseView, renderSetsForExercise } from './exerciseView.js'; // Future imports
 import { renderBodyWeightHistory } from './bodyWeightView.js'; // Import actual
-// import { populateExerciseSelect, handleAnalysisTypeChange } from './analysisView.js'; // Future imports
+import { populateExerciseSelect, handleAnalysisTypeChange } from './analysisView.js'; // Import actual
 
-
-// Placeholders for rendering functions that are not yet moved
-const placeholderRenderer = {
-    // renderSessions, renderBodyWeightHistory are now imported directly
-    renderExercisesForSession: (sessionId) => console.warn(`viewManager calling placeholderRenderer.renderExercisesForSession(${sessionId})`),
-    renderDetailedExerciseView: (exerciseName) => console.warn(`viewManager calling placeholderRenderer.renderDetailedExerciseView(${exerciseName})`),
-    renderSetsForExercise: (sessionId, exerciseId) => console.warn(`viewManager calling placeholderRenderer.renderSetsForExercise(${sessionId}, ${exerciseId})`),
-    populateExerciseSelect: () => console.warn("viewManager calling placeholderRenderer.populateExerciseSelect"),
-    handleAnalysisTypeChange: () => console.warn("viewManager calling placeholderRenderer.handleAnalysisTypeChange"),
-};
+// placeholderRenderer is no longer needed.
+// Functions like renderExercisesForSession are called by other modules (e.g., auth.js for view restoration, or sessionView.js for navigation)
+// which import them directly from exerciseView.js.
+// viewManager is responsible for showing/hiding views and main navigation, not for invoking detailed content rendering of other views.
 
 
 export function saveViewState() {
@@ -138,8 +132,8 @@ export function setupNavEventListeners() {
                 renderSessions(); // Use actual renderSessions
             } else if (targetId === 'analysis') {
                 state.setCurrentView('analysisView'); // Or a more specific view name
-                placeholderRenderer.populateExerciseSelect();
-                placeholderRenderer.handleAnalysisTypeChange();
+                populateExerciseSelect(); // Use actual
+                handleAnalysisTypeChange(); // Use actual
             } else if (targetId === 'body-weight') {
                 state.setCurrentView('bodyWeightView');
                 renderBodyWeightHistory(); // Use actual

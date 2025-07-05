@@ -37,26 +37,26 @@ The project is organized with client-side code primarily in JavaScript, HTML for
 ```
 .
 ├── index.html              # Main HTML file
-├── style.css               # All CSS styles
-├── script.js               # Original monolithic script (to be deprecated/removed)
-├── src/                    # Directory for modular JavaScript source code
-│   ├── app.js              # Main application entry point, initializes the app
-│   ├── config.js           # Supabase URL and Key, other configurations
-│   ├── state.js            # Global application state management
-│   ├── domElements.js      # Centralized DOM element selections
-│   ├── api.js              # Handles all communication with the Supabase backend (data CRUD)
-│   ├── auth.js             # Authentication logic (signup, login, logout, session management)
-│   ├── ui/                 # UI-related modules
+├── src/                    # Directory for all source assets
+│   ├── css/                # CSS files
+│   │   └── style.css       # All CSS styles
+│   ├── ui/                 # UI-related JavaScript modules
 │   │   ├── renderUtils.js  # Utility functions for UI rendering (e.g., feedback messages)
 │   │   ├── viewManager.js  # Manages view switching and main navigation
 │   │   ├── sessionView.js  # Renders and manages session list and interactions
 │   │   ├── exerciseView.js # Renders and manages exercise lists, set tracking, detailed history
 │   │   ├── bodyWeightView.js # Renders and manages body weight logging and display
 │   │   └── analysisView.js # Renders and manages the analysis tab, charts
-│   └── utils.js            # General utility functions (e.g., calculations, formatting) - if created
+│   ├── app.js              # Main application JavaScript entry point, initializes the app
+│   ├── config.js           # Supabase URL and Key, other configurations
+│   ├── state.js            # Global application state management
+│   ├── domElements.js      # Centralized DOM element selections
+│   ├── api.js              # Handles all communication with the Supabase backend (data CRUD)
+│   ├── auth.js             # Authentication logic (signup, login, logout, session management, profile updates)
+│   └── utils.js            # General utility functions (e.g., calculations)
 └── README.md               # This file
 ```
-*(Note: The modularization into `src/` is in progress. Some files like `utils.js` or more granular UI components might be added as refactoring continues.)*
+*(Note: The root `script.js` has been removed as its functionality is now migrated to modules within `src/`.)*
 
 ## Setup and Running the Project
 
