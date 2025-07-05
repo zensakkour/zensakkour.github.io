@@ -942,27 +942,52 @@ document.addEventListener('DOMContentLoaded', () => {
         // Display sets for the CURRENT exercise instance
         if (!exercise.sets || exercise.sets.length === 0) {
             setsListDiv.innerHTML = '<p class="empty-state-message">No sets recorded for this instance. Add one below.</p>';
-            // Placeholders are already set above
             return;
         }
 
-        // Sort sets for the current instance by timestamp (creation time)
-        const sortedSetsCurrentInstance = [...exercise.sets].sort((a,b) => {
-            const timeA = typeof a.timestamp === 'string' ? new Date(a.timestamp) : a.timestamp;
-            const timeB = typeof b.timestamp === 'string' ? new Date(b.timestamp) : b.timestamp;
-            return timeA - timeB;
+        const setsByDate = {};
+        exercise.sets.forEach(set => {
+            const setTimestamp = set.timestamp instanceof Date ? set.timestamp : new Date(set.timestamp);
+            if (isNaN(setTimestamp.getTime())) return; // Skip invalid timestamps
+
+            const dateKey = setTimestamp.toLocaleDateString('en-CA'); // YYYY-MM-DD
+            if (!setsByDate[dateKey]) {
+                setsByDate[dateKey] = [];
+            }
+            setsByDate[dateKey].push(set);
         });
 
-        sortedSetsCurrentInstance.forEach((set, index) => {
-            const setItemContainer = document.createElement('div');
-            setItemContainer.className = 'set-item';
-            const setDetails = document.createElement('span');
-            const setTime = set.timestamp instanceof Date ? set.timestamp : new Date(set.timestamp);
-            const formattedTimestamp = `${setTime.toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: '2-digit' })} ${setTime.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}`;
-            setDetails.textContent = `Set ${index + 1} (${formattedTimestamp}): ${set.weight} kg x ${set.reps} reps`;
-            if(set.notes) setDetails.textContent += ` (${set.notes})`;
+        const sortedDateKeys = Object.keys(setsByDate).sort((a, b) => new Date(b) - new Date(a)); // Most recent date first
 
-            const deleteBtn = document.createElement('button');
+        if (sortedDateKeys.length === 0) { // Should not happen if exercise.sets is not empty, but as a safeguard
+             setsListDiv.innerHTML = '<p class="empty-state-message">No valid sets to display.</p>';
+             return;
+        }
+
+        sortedDateKeys.forEach(dateKey => {
+            const dateSeparator = document.createElement('div');
+            dateSeparator.className = 'date-separator';
+            const displayDate = new Date(dateKey + 'T00:00:00'); // Ensure correct parsing for display
+            dateSeparator.textContent = `---- ${displayDate.toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' })} ----`;
+            setsListDiv.appendChild(dateSeparator);
+
+            const setsForThisDate = setsByDate[dateKey].sort((a,b) => { // Sort sets chronologically for the day
+                const timeA = a.timestamp instanceof Date ? a.timestamp : new Date(a.timestamp);
+                const timeB = b.timestamp instanceof Date ? b.timestamp : new Date(b.timestamp);
+                return timeA - timeB;
+            });
+
+            setsForThisDate.forEach((set, index) => {
+                const setItemContainer = document.createElement('div');
+                setItemContainer.className = 'set-item';
+                const setDetails = document.createElement('span');
+                const setTime = set.timestamp instanceof Date ? set.timestamp : new Date(set.timestamp);
+                // Display time only, as date is in separator
+                const formattedTime = setTime.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+                setDetails.textContent = `Set ${index + 1} (${formattedTime}): ${set.weight} kg x ${set.reps} reps`;
+                if(set.notes) setDetails.textContent += ` (${set.notes})`;
+
+                const deleteBtn = document.createElement('button');
             deleteBtn.innerHTML = '&times;';
             deleteBtn.className = 'delete-btn button-danger';
             deleteBtn.title = `Delete Set ${index + 1}`;
@@ -1322,69 +1347,85 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
-        let setsToDisplay = [];
+        detailedExerciseHistoryListEl.innerHTML = ''; // Clear previous list
+
+        // Helper function to render a single historical set item
+        function renderHistoricalSetItem(set, displayIndex, parentListElement) {
+            const item = document.createElement('div');
+            item.className = 'set-item-historical';
+
+            const setDetailsSpan = document.createElement('span');
+            const setActualTime = set.timestamp instanceof Date ? set.timestamp : new Date(set.timestamp);
+            const displayTime = setActualTime.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+
+            let prefix = `Set ${displayIndex} (${set.sessionName} @ ${displayTime}):`;
+            let setText = `${prefix} ${set.weight} kg x ${set.reps} reps`;
+            if (set.notes) setText += ` (${set.notes})`;
+            setDetailsSpan.textContent = setText;
+
+            item.appendChild(setDetailsSpan);
+            parentListElement.appendChild(item);
+        }
+
+        let setsToProcessForDisplay = [];
         if (detailedHistoryViewMode === 'lastDay') {
-            toggleHistoryViewBtn.textContent = 'Show All History'; // Correct: click to show all
+            toggleHistoryViewBtn.textContent = 'Show All History';
             if (allSetsForExerciseName.length > 0) {
-                // Find the date of the most recent set
-                // allSetsForExerciseName is already sorted with the most recent set at index 0
-                const mostRecentSetTimestamp = allSetsForExerciseName[0].timestamp; // This is a Date object
-
-                // Using 'en-CA' locale for YYYY-MM-DD format. Consider a more robust date formatting utility if needed.
+                const mostRecentSetTimestamp = allSetsForExerciseName[0].timestamp; // allSetsForExerciseName is sorted most recent set first
                 const targetDateStr = mostRecentSetTimestamp.toLocaleDateString('en-CA');
-
                 console.log(`[renderDetailedExerciseView - lastDay] Target date for filtering: ${targetDateStr}`);
-
-                setsToDisplay = allSetsForExerciseName.filter(s => {
-                    const setDateStr = s.timestamp.toLocaleDateString('en-CA');
-                    return setDateStr === targetDateStr;
-                });
-
-                // setsToDisplay currently inherits sort order from allSetsForExerciseName (most recent first for the day)
-                // For display in the list, we want the sets of that day sorted oldest first.
-                setsToDisplay.sort((a, b) => a.timestamp - b.timestamp);
-                console.log(`[renderDetailedExerciseView - lastDay] Found ${setsToDisplay.length} sets for date ${targetDateStr}`);
-            } else {
-                 console.log("[renderDetailedExerciseView - lastDay] No sets found in allSetsForExerciseName.");
+                setsToProcessForDisplay = allSetsForExerciseName.filter(s => s.timestamp.toLocaleDateString('en-CA') === targetDateStr);
             }
         } else { // 'allHistory'
-            toggleHistoryViewBtn.textContent = 'Show Last Day Only'; // Correct: click to show last day
-            console.log("[renderDetailedExerciseView] Setting to display allHistory.");
-            // Create a new sorted array for display (oldest first for all history)
-            setsToDisplay = [...allSetsForExerciseName].sort((a,b) => a.timestamp - b.timestamp);
-            console.log("[renderDetailedExerciseView] Sets for allHistory display (count):", setsToDisplay.length);
+            toggleHistoryViewBtn.textContent = 'Show Last Day Only';
+            console.log("[renderDetailedExerciseView] Using allHistory.");
+            setsToProcessForDisplay = [...allSetsForExerciseName];
         }
 
-
-        if (setsToDisplay.length === 0) {
+        if (setsToProcessForDisplay.length === 0) {
             detailedExerciseHistoryListEl.innerHTML = `<p class="empty-state-message">No sets found for this view (${detailedHistoryViewMode}).</p>`;
         } else {
-            setsToDisplay.forEach(set => {
-                const item = document.createElement('div');
-                item.className = 'set-item-historical';
-                const datePrefix = document.createElement('span');
-                datePrefix.className = 'date-prefix';
-                // Use set.timestamp directly as it's the most accurate date/time for the set itself.
-                // Ensure set.timestamp is a Date object. It should be after data loading or set creation.
-                const setActualTime = set.timestamp instanceof Date ? set.timestamp : new Date(set.timestamp);
-                const displayDate = setActualTime.toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: '2-digit' });
-                const displayTime = setActualTime.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
-                datePrefix.textContent = `${displayDate} (${set.sessionName}) Set @ ${displayTime}: `;
-                item.appendChild(datePrefix);
-                item.append(`${set.weight} kg x ${set.reps} reps`);
-                if (set.notes) item.append(` (${set.notes})`);
-                detailedExerciseHistoryListEl.appendChild(item);
-
-                // Populate 1RM calculator with sets from the current view (setsToDisplay)
-                if (set.reps > 0 && set.weight > 0) {
-                    const option = document.createElement('option');
-                    option.value = JSON.stringify({ weight: set.weight, reps: set.reps });
-                    const optionDateStr = set.timestamp.toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: '2-digit' });
-                    option.textContent = `${optionDateStr} ${set.timestamp.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})} - ${set.weight}kg x ${set.reps}reps`;
-                    setFor1RMSelect.appendChild(option);
+            const setsByDate = {};
+            setsToProcessForDisplay.forEach(set => {
+                const dateKey = set.timestamp.toLocaleDateString('en-CA'); // YYYY-MM-DD
+                if (!setsByDate[dateKey]) {
+                    setsByDate[dateKey] = [];
                 }
+                setsByDate[dateKey].push(set);
+            });
+
+            const sortedDateKeys = Object.keys(setsByDate).sort((a, b) => new Date(b) - new Date(a)); // Most recent date first
+
+            sortedDateKeys.forEach(dateKey => {
+                const dateSeparator = document.createElement('div');
+                dateSeparator.className = 'date-separator';
+                const displayDateObj = new Date(dateKey + 'T00:00:00');
+                dateSeparator.textContent = `---- ${displayDateObj.toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' })} ----`;
+                detailedExerciseHistoryListEl.appendChild(dateSeparator);
+
+                const setsForThisDate = setsByDate[dateKey].sort((a,b) => a.timestamp - b.timestamp); // Sort sets chronologically for the day
+
+                setsForThisDate.forEach((set, index) => {
+                    renderHistoricalSetItem(set, index + 1, detailedExerciseHistoryListEl);
+                });
             });
         }
+
+        // Populate 1RM calculator: Use all sets for the exercise name, regardless of current filter for display list
+        // This was previously inside the setsToDisplay.forEach loop, which was incorrect.
+        // It should always use allSetsForExerciseName for the 1RM calculator.
+        // The setFor1RMSelect is cleared at the start of renderDetailedExerciseView.
+        const allSetsSortedFor1RM = [...allSetsForExerciseName].sort((a,b) => b.timestamp - a.timestamp); // Most recent first for 1RM dropdown
+        allSetsSortedFor1RM.forEach(set => {
+            if (set.reps > 0 && set.weight > 0) {
+                const option = document.createElement('option');
+                option.value = JSON.stringify({ weight: set.weight, reps: set.reps });
+                const setActualTime = set.timestamp instanceof Date ? set.timestamp : new Date(set.timestamp);
+                const optionDateStr = setActualTime.toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: '2-digit' });
+                option.textContent = `${optionDateStr} ${setActualTime.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})} - ${set.weight}kg x ${set.reps}reps (${set.sessionName})`;
+                setFor1RMSelect.appendChild(option);
+            }
+        });
 
         // Chart will now show Total Daily Volume
         if (detailedExerciseChart) detailedExerciseChart.destroy();

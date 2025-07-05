@@ -534,6 +534,17 @@ ul.styled-list { /* Remove default list styling if ul is used */
     /* height: auto !important; -- Removed, let Chart.js handle it */
 }
 
+.date-separator {
+    font-weight: bold;
+    color: var(--primary-color);
+    margin-top: 1em;
+    margin-bottom: 0.5em;
+    text-align: center;
+    border-top: 1px solid var(--input-border);
+    border-bottom: 1px solid var(--input-border);
+    padding: 5px 0;
+}
+
 /* 1RM Calculator Styling */
 #one-rep-max-calculator h4 {
     color: var(--primary-color);
