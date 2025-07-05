@@ -1,6 +1,22 @@
 document.addEventListener('DOMContentLoaded', () => {
     console.log("JavaScript file loaded and DOM fully parsed.");
 
+    // Utility function for YYYY-MM-DD formatting (re-adding)
+    function getYYYYMMDD(dateObj) {
+        if (!(dateObj instanceof Date) || isNaN(dateObj.getTime())) {
+            const d = new Date();
+            console.warn("Invalid date passed to getYYYYMMDD, using current date as fallback:", dateObj);
+            const year = d.getFullYear();
+            const month = (d.getMonth() + 1).toString().padStart(2, '0');
+            const day = d.getDate().toString().padStart(2, '0');
+            return `${year}-${month}-${day}`;
+        }
+        const year = dateObj.getFullYear();
+        const month = (dateObj.getMonth() + 1).toString().padStart(2, '0');
+        const day = dateObj.getDate().toString().padStart(2, '0');
+        return `${year}-${month}-${day}`;
+    }
+
     // Supabase Client Initialization
     const SUPABASE_URL = 'https://cdbbaurycauyhlymmaec.supabase.co';
     const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNkYmJhdXJ5Y2F1eWhseW1tYWVjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTE2Mzc3NTcsImV4cCI6MjA2NzIxMzc1N30.gSMNIDm41JT6Ze79qawcqjIAn8Y4QsnwoXXRgzpv62s';
@@ -95,7 +111,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let currentUser = null; // Holds user object from Supabase, including profile data after load
     let currentView = 'sessionList'; // To track the current active view for session storage
     let appInitializedOnce = false; // Flag to prevent re-initialization issues
-    let detailedHistoryViewMode = 'lastInstance'; // 'lastInstance' or 'allHistory'
+    let detailedHistoryViewMode = 'lastDay'; // 'lastDay' or 'allHistory'
 
     // --- View State Persistence ---
     function saveViewState() {
@@ -1322,68 +1338,59 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
-        let setsToDisplay = [];
-        if (detailedHistoryViewMode === 'lastInstance') {
-            console.log("Filtering for lastInstance."); // DEBUG
+        detailedExerciseHistoryListEl.innerHTML = ''; // Clear previous items
+
+        let setsToDisplayInList = [];
+        if (detailedHistoryViewMode === 'lastDay') {
             toggleHistoryViewBtn.textContent = 'Show All History';
-            // Identify the specific exercise instance (original exercise_id) of the most recent set
-            const mostRecentSetOverall = allSetsForExerciseName[0];
-            if (!mostRecentSetOverall) {
-                console.error("[renderDetailedExerciseView] No sets found in allSetsForExerciseName for lastInstance logic (this should have been caught earlier).");
-                setsToDisplay = [];
-            } else {
-                const lastPerformedExerciseInstanceId = mostRecentSetOverall.exercise_id;
-                console.log("[renderDetailedExerciseView] Target lastPerformedExerciseInstanceId:", lastPerformedExerciseInstanceId); // INTENSIVE DEBUG
-                console.log("[renderDetailedExerciseView] Length of allSetsForExerciseName before filter:", allSetsForExerciseName.length); // INTENSIVE DEBUG
+            if (allSetsForExerciseName.length > 0) {
+                // allSetsForExerciseName is already sorted with the most recent set at index 0
+                const mostRecentSetTimestamp = allSetsForExerciseName[0].timestamp;
+                const targetDateStr = getYYYYMMDD(mostRecentSetTimestamp); // Use utility
+                console.log(`[renderDetailedExerciseView - lastDay] Target date for filtering: ${targetDateStr}`);
 
-                setsToDisplay = allSetsForExerciseName.filter(s => {
-                    const match = s.exercise_id === lastPerformedExerciseInstanceId;
-                    // INTENSIVE DEBUG - Log each comparison
-                    // console.log(`  [Filter] Set ID: ${s.id}, Set ExID: ${s.exercise_id}, Target ExID: ${lastPerformedExerciseInstanceId}, Match: ${match}`);
-                    return match;
-                });
-                console.log("[renderDetailedExerciseView] Length of setsToDisplay after filter:", setsToDisplay.length); // INTENSIVE DEBUG
-                console.log("[renderDetailedExerciseView] Sets after filtering for lastInstance:", JSON.parse(JSON.stringify(setsToDisplay.map(s => ({id: s.id, exercise_id: s.exercise_id, timestamp: s.timestamp}))))); // Log relevant parts
-
-                setsToDisplay.sort((a,b) => a.timestamp - b.timestamp); // Sort oldest first for display
+                setsToDisplayInList = allSetsForExerciseName.filter(s => getYYYYMMDD(s.timestamp) === targetDateStr);
+                // Sort the sets for the target day chronologically (oldest first) for display
+                setsToDisplayInList.sort((a, b) => a.timestamp - b.timestamp);
+                console.log(`[renderDetailedExerciseView - lastDay] Found ${setsToDisplayInList.length} sets for date ${targetDateStr}`);
             }
         } else { // 'allHistory'
-            console.log("[renderDetailedExerciseView] Setting to display allHistory."); // INTENSIVE DEBUG
-            toggleHistoryViewBtn.textContent = 'Show Last Session Only';
-            setsToDisplay = [...allSetsForExerciseName].sort((a,b) => a.timestamp - b.timestamp); // oldest first for display
-            console.log("[renderDetailedExerciseView] Sets for allHistory display (count):", setsToDisplay.length); // INTENSIVE DEBUG
+            toggleHistoryViewBtn.textContent = 'Show Last Day Only';
+            console.log("[renderDetailedExerciseView] Displaying allHistory.");
+            // Sort all sets chronologically (oldest first) for display
+            setsToDisplayInList = [...allSetsForExerciseName].sort((a,b) => a.timestamp - b.timestamp);
         }
 
-
-        if (setsToDisplay.length === 0) {
+        if (setsToDisplayInList.length === 0) {
             detailedExerciseHistoryListEl.innerHTML = `<p class="empty-state-message">No sets found for this view (${detailedHistoryViewMode}).</p>`;
         } else {
-            setsToDisplay.forEach(set => {
+            // Simple sequential numbering for this step (date grouping comes later)
+            setsToDisplayInList.forEach((set, index) => {
                 const item = document.createElement('div');
                 item.className = 'set-item-historical';
-                const datePrefix = document.createElement('span');
-                datePrefix.className = 'date-prefix';
-                // Use set.timestamp directly as it's the most accurate date/time for the set itself.
-                // Ensure set.timestamp is a Date object. It should be after data loading or set creation.
+
+                const setDetailsSpan = document.createElement('span');
                 const setActualTime = set.timestamp instanceof Date ? set.timestamp : new Date(set.timestamp);
                 const displayDate = setActualTime.toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: '2-digit' });
                 const displayTime = setActualTime.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
-                datePrefix.textContent = `${displayDate} (${set.sessionName}) Set @ ${displayTime}: `;
-                item.appendChild(datePrefix);
-                item.append(`${set.weight} kg x ${set.reps} reps`);
-                if (set.notes) item.append(` (${set.notes})`);
-                detailedExerciseHistoryListEl.appendChild(item);
 
-                // Populate 1RM calculator with sets from the current view (setsToDisplay)
-                if (set.reps > 0 && set.weight > 0) {
-                    const option = document.createElement('option');
-                    option.value = JSON.stringify({ weight: set.weight, reps: set.reps });
-                    const optionDateStr = set.timestamp.toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: '2-digit' });
-                    option.textContent = `${optionDateStr} ${set.timestamp.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})} - ${set.weight}kg x ${set.reps}reps`;
-                    setFor1RMSelect.appendChild(option);
-                }
+                // For this step, set numbering is sequential for the displayed list.
+                // Session name provides context.
+                setDetailsSpan.textContent = `Set ${index + 1} (${displayDate} ${set.sessionName} @ ${displayTime}): ${set.weight} kg x ${set.reps} reps`;
+                if (set.notes) setDetailsSpan.textContent += ` (${set.notes})`;
+
+                item.appendChild(setDetailsSpan);
+                detailedExerciseHistoryListEl.appendChild(item);
             });
         }
+
+        // Populate 1RM calculator using ALL sets for the exercise name, not just the filtered list.
+        // The setFor1RMSelect is cleared at the beginning of renderDetailedExerciseView.
+        // This ensures 1RM always has all data.
+        // (The existing code for 1RM select population after this block should be fine if it uses allSetsForExerciseName)
+        // The original code for 1RM was inside the loop, it needs to be outside and use allSetsForExerciseName.
+        // The current restored version already has the 1RM population logic correctly using allSetsForExerciseName *after* this block.
+        // So, no change needed for 1RM population here, just ensuring 'setsToDisplay.forEach' doesn't repopulate it.
 
         // Chart will now show Total Daily Volume
         if (detailedExerciseChart) detailedExerciseChart.destroy();
@@ -2193,10 +2200,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
     if (toggleHistoryViewBtn) {
         toggleHistoryViewBtn.addEventListener('click', () => {
-            if (detailedHistoryViewMode === 'lastInstance') {
+            if (detailedHistoryViewMode === 'lastDay') {
                 detailedHistoryViewMode = 'allHistory';
-            } else {
-                detailedHistoryViewMode = 'lastInstance';
+            } else { // it was 'allHistory'
+                detailedHistoryViewMode = 'lastDay';
             }
             console.log("[ToggleBtn] Toggled detailedHistoryViewMode to:", detailedHistoryViewMode); // INTENSIVE DEBUG
             if (currentViewingExerciseName) { // Ensure there's an exercise context
