@@ -1093,6 +1093,41 @@ document.addEventListener('DOMContentLoaded', () => {
     // function showSetTimestampEditUI(setItemContainer, set, sessionId, exerciseId) { ... }
     // async function saveSetTimestamp(sessionId, exerciseId, setId, newTimestampISO) { ... }
 
+    // --- Chart Data Aggregation Helper ---
+    function calculateDailyVolume(setsArray) {
+        if (!setsArray || setsArray.length === 0) {
+            return [];
+        }
+
+        const dailyData = {}; // Use an object for easy aggregation by date key
+
+        setsArray.forEach(set => {
+            const setTimestamp = set.timestamp instanceof Date ? set.timestamp : new Date(set.timestamp);
+            if (isNaN(setTimestamp.getTime())) return; // Skip invalid timestamps
+
+            // Create a YYYY-MM-DD key for grouping by day in local timezone
+            const dateKey = `${setTimestamp.getFullYear()}-${(setTimestamp.getMonth() + 1).toString().padStart(2, '0')}-${setTimestamp.getDate().toString().padStart(2, '0')}`;
+
+            const volume = (parseFloat(set.weight) || 0) * (parseInt(set.reps) || 0);
+
+            if (!dailyData[dateKey]) {
+                dailyData[dateKey] = {
+                    date: dateKey, // Store the original YYYY-MM-DD key for sorting
+                    displayDate: setTimestamp.toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: '2-digit' }),
+                    totalVolume: 0,
+                    // Could also store count of sets or other daily aggregates here if needed later
+                };
+            }
+            dailyData[dateKey].totalVolume += volume;
+        });
+
+        // Convert object to array and sort by date
+        const aggregatedArray = Object.values(dailyData);
+        aggregatedArray.sort((a, b) => new Date(a.date) - new Date(b.date)); // Sort by YYYY-MM-DD
+
+        return aggregatedArray;
+    }
+
 
     // --- UI Navigation Functions ---
     function showSessionListView(isRestoring = false) {
@@ -1242,6 +1277,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // --- Render Detailed Exercise View ---
     function renderDetailedExerciseView(exerciseName) {
+        console.log("Rendering detailed history for:", exerciseName, "Mode:", detailedHistoryViewMode); // DEBUG
         currentViewingExerciseName = exerciseName; // This is exercise.name
         detailedExerciseNameEl.textContent = exerciseName;
         detailedExerciseHistoryListEl.innerHTML = '';
@@ -1278,20 +1314,30 @@ document.addEventListener('DOMContentLoaded', () => {
 
         let setsToDisplay = [];
         if (detailedHistoryViewMode === 'lastInstance') {
+            console.log("Filtering for lastInstance."); // DEBUG
             toggleHistoryViewBtn.textContent = 'Show All History';
             // Identify the specific exercise instance (original exercise_id) of the most recent set
             const mostRecentSetOverall = allSetsForExerciseName[0];
-            const lastPerformedExerciseInstanceId = mostRecentSetOverall.exercise_id;
+            if (!mostRecentSetOverall) { // Should be caught by earlier check but good to be safe
+                console.error("No sets found in allSetsForExerciseName for lastInstance logic.");
+                setsToDisplay = [];
+            } else {
+                const lastPerformedExerciseInstanceId = mostRecentSetOverall.exercise_id;
+                console.log("Last performed exercise_id (for instance):", lastPerformedExerciseInstanceId); // DEBUG
 
-            // Filter to get all sets belonging to that last performed exercise instance
-            setsToDisplay = allSetsForExerciseName.filter(
-                s => s.exercise_id === lastPerformedExerciseInstanceId
-            );
-            // Sort these sets by their actual recorded timestamp for display order (oldest to newest for that instance)
-            setsToDisplay.sort((a,b) => a.timestamp - b.timestamp);
+                // Filter to get all sets belonging to that last performed exercise instance
+                setsToDisplay = allSetsForExerciseName.filter(
+                    s => s.exercise_id === lastPerformedExerciseInstanceId
+                );
+                console.log("Sets after filtering for lastInstance:", JSON.parse(JSON.stringify(setsToDisplay))); // DEBUG (deep copy for logging)
+                // Sort these sets by their actual recorded timestamp for display order (oldest to newest for that instance)
+                setsToDisplay.sort((a,b) => a.timestamp - b.timestamp);
+            }
         } else { // 'allHistory'
+            console.log("Setting to display allHistory."); // DEBUG
             toggleHistoryViewBtn.textContent = 'Show Last Session Only';
             setsToDisplay = [...allSetsForExerciseName].sort((a,b) => a.timestamp - b.timestamp); // oldest first for display
+            console.log("Sets for allHistory display:", JSON.parse(JSON.stringify(setsToDisplay))); // DEBUG
         }
 
 
@@ -1325,30 +1371,47 @@ document.addEventListener('DOMContentLoaded', () => {
             });
         }
 
-        // Chart should still show all historical data for the exercise NAME for trend analysis
+        // Chart will now show Total Daily Volume
         if (detailedExerciseChart) detailedExerciseChart.destroy();
-        // allSetsForExerciseName is already sorted with most recent first, for chart sort oldest first
-        const chartDataPoints = [...allSetsForExerciseName].sort((a,b) => a.timestamp - b.timestamp); // Use all sets for chart
 
-        if (chartDataPoints.length > 0) {
-            const labels = chartDataPoints.map(s => s.timestamp.toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: '2-digit' }));
-            const weightData = chartDataPoints.map(s => s.weight);
+        const dailyVolumeData = calculateDailyVolume(allSetsForExerciseName); // Use all sets for this exercise name
+
+        if (dailyVolumeData.length > 0) {
+            const labels = dailyVolumeData.map(dayData => dayData.displayDate); // Already DD/MM/YY
+            const totalVolumes = dailyVolumeData.map(dayData => dayData.totalVolume);
+
             detailedExerciseChart = new Chart(detailedExerciseChartCanvas, {
                 type: 'line',
                 data: {
                     labels: labels,
                     datasets: [{
-                        label: 'Weight Lifted (kg)', data: weightData, borderColor: 'rgb(75, 192, 192)',
-                        backgroundColor: 'rgba(75, 192, 192, 0.2)', fill: true, tension: 0.1
+                        label: 'Total Daily Volume (kg)',
+                        data: totalVolumes,
+                        borderColor: 'rgb(75, 192, 192)',
+                        backgroundColor: 'rgba(75, 192, 192, 0.2)',
+                        fill: true,
+                        tension: 0.1
                     }]
                 },
                 options: {
                     responsive: true, maintainAspectRatio: false,
                     scales: {
-                        x: { ticks: { color: '#ccc' }, grid: { color: 'rgba(204,204,204,0.1)'} },
-                        y: { ticks: { color: '#ccc' }, grid: { color: 'rgba(204,204,204,0.1)'}, title: { display: true, text: 'Weight (kg)', color: '#ccc'} }
+                        x: {
+                            ticks: { color: '#ccc' },
+                            grid: { color: 'rgba(204,204,204,0.1)'},
+                            title: { display: true, text: 'Date', color: '#ccc' }
+                        },
+                        y: {
+                            ticks: { color: '#ccc' },
+                            grid: { color: 'rgba(204,204,204,0.1)'},
+                            title: { display: true, text: 'Total Daily Volume (kg)', color: '#ccc'},
+                            beginAtZero: true
+                        }
                     },
-                    plugins: { legend: { labels: { color: '#ccc'} }, title: { display: false } }
+                    plugins: {
+                        legend: { labels: { color: '#ccc'} },
+                        title: { display: true, text: `${exerciseName} - Daily Volume`, color: '#ccc' }
+                    }
                 }
             });
             document.getElementById('detailed-exercise-chart-container').style.display = 'block';
@@ -1731,35 +1794,62 @@ document.addEventListener('DOMContentLoaded', () => {
         if (exerciseDataPoints.length === 0) {
             rawDataOutput.textContent = "No data for this exercise."; return;
         }
-        rawDataOutput.textContent = JSON.stringify(exerciseDataPoints.map(dp => ({
+        rawDataOutput.textContent = JSON.stringify(exerciseDataPoints.map(dp => ({ // This can still show raw sets
             date: dp.timestamp.toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: '2-digit' }),
             time: dp.timestamp.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}),
             weight: dp.weight, reps: dp.reps, volume: dp.volume
         })), null, 2);
 
-        const labels = exerciseDataPoints.map(dp =>
-            dp.timestamp.toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: '2-digit' }) +
-            ' ' + dp.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-        );
+        // Aggregate data for the chart
+        const dailyVolumeData = calculateDailyVolume(exerciseDataPoints);
+
+        if (dailyVolumeData.length === 0) {
+            if (progressChart) progressChart.destroy();
+            // Potentially show a "no data for chart" message or leave it blank
+            document.getElementById('progress-chart-container').style.display = 'none'; // Hide if no data
+            rawDataOutput.textContent = "No data for this exercise to plot daily volume."; // Update raw data message
+            return;
+        }
+        document.getElementById('progress-chart-container').style.display = 'block'; // Ensure visible
+
+        const labels = dailyVolumeData.map(dayData => dayData.displayDate); // DD/MM/YY
+        const totalVolumes = dailyVolumeData.map(dayData => dayData.totalVolume);
+
         progressChart = new Chart(progressChartCanvas, {
             type: 'line',
             data: {
                 labels: labels,
                 datasets: [
-                    { label: 'Weight (kg)', data: exerciseDataPoints.map(dp => dp.weight), borderColor: 'rgb(255, 99, 132)', backgroundColor: 'rgba(255, 99, 132, 0.5)', yAxisID: 'yWeight' },
-                    { label: 'Reps', data: exerciseDataPoints.map(dp => dp.reps), borderColor: 'rgb(54, 162, 235)', backgroundColor: 'rgba(54, 162, 235, 0.5)', yAxisID: 'yReps' },
-                    { label: 'Volume (W x R)', data: exerciseDataPoints.map(dp => dp.volume), borderColor: 'rgb(75, 192, 192)', backgroundColor: 'rgba(75, 192, 192, 0.5)', yAxisID: 'yVolume', hidden: true }
+                    {
+                        label: 'Total Daily Volume (kg)',
+                        data: totalVolumes,
+                        borderColor: 'rgb(75, 192, 192)',
+                        backgroundColor: 'rgba(75, 192, 192, 0.5)',
+                        fill: true,
+                        tension: 0.1
+                    }
                 ]
             },
-            options: { /* scales and plugins options as before */
+            options: {
                 responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false },
                 scales: {
-                    x: { display: true, title: { display: true, text: 'Date & Time', color: '#f4f4f4' }, ticks: { color: '#ccc' } },
-                    yWeight: { type: 'linear', display: true, position: 'left', title: { display: true, text: 'Weight (kg)', color: 'rgb(255, 99, 132)' }, ticks: { color: 'rgb(255, 99, 132)' } },
-                    yReps: { type: 'linear', display: true, position: 'right', title: { display: true, text: 'Reps', color: 'rgb(54, 162, 235)' }, ticks: { color: 'rgb(54, 162, 235)' }, grid: { drawOnChartArea: false } },
-                    yVolume: { type: 'linear', display: true, position: 'right', title: { display: true, text: 'Volume', color: 'rgb(75, 192, 192)' }, ticks: { color: 'rgb(75, 192, 192)' }, grid: { drawOnChartArea: false } }
+                    x: {
+                        display: true,
+                        title: { display: true, text: 'Date', color: '#f4f4f4' },
+                        ticks: { color: '#ccc' }
+                    },
+                    y: {
+                        display: true,
+                        title: { display: true, text: 'Total Daily Volume (kg)', color: '#f4f4f4' },
+                        ticks: { color: '#ccc' },
+                        beginAtZero: true
+                    }
                 },
-                plugins: { legend: { labels: { color: '#f4f4f4' } }, tooltip: { titleColor: '#fff', bodyColor: '#ddd', backgroundColor: 'rgba(0,0,0,0.8)' } }
+                plugins: {
+                    legend: { labels: { color: '#f4f4f4' } },
+                    tooltip: { titleColor: '#fff', bodyColor: '#ddd', backgroundColor: 'rgba(0,0,0,0.8)' },
+                    title: { display: true, text: `${exerciseName} - Daily Volume Progress`, color: '#f4f4f4', font: {size: 16}}
+                }
             }
         });
     }
@@ -2094,6 +2184,7 @@ document.addEventListener('DOMContentLoaded', () => {
             } else {
                 detailedHistoryViewMode = 'lastInstance';
             }
+            console.log("Toggled detailedHistoryViewMode to:", detailedHistoryViewMode); // DEBUG
             if (currentViewingExerciseName) { // Ensure there's an exercise context
                 renderDetailedExerciseView(currentViewingExerciseName);
             }
