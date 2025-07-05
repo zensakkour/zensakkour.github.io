@@ -1277,7 +1277,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // --- Render Detailed Exercise View ---
     function renderDetailedExerciseView(exerciseName) {
-        console.log("Rendering detailed history for:", exerciseName, "Mode:", detailedHistoryViewMode); // DEBUG
+        console.log("[renderDetailedExerciseView] START - Exercise:", exerciseName, "Mode:", detailedHistoryViewMode); // INTENSIVE DEBUG
         currentViewingExerciseName = exerciseName; // This is exercise.name
         detailedExerciseNameEl.textContent = exerciseName;
         detailedExerciseHistoryListEl.innerHTML = '';
@@ -1303,6 +1303,16 @@ document.addEventListener('DOMContentLoaded', () => {
         // Sort all sets for this exercise NAME by timestamp, most recent first, to find the last performance
         allSetsForExerciseName.sort((a, b) => b.timestamp - a.timestamp);
 
+        // INTENSIVE DEBUG: Log sample of allSetsForExerciseName
+        if (allSetsForExerciseName.length > 0) {
+            console.log("[renderDetailedExerciseView] Sample of allSetsForExerciseName (up to 5, most recent first):");
+            allSetsForExerciseName.slice(0, 5).forEach(s => {
+                console.log(`  Set ID: ${s.id}, Timestamp: ${s.timestamp.toISOString()}, Exercise ID (FK): ${s.exercise_id}`);
+            });
+        } else {
+            console.log("[renderDetailedExerciseView] allSetsForExerciseName is empty.");
+        }
+
         if (allSetsForExerciseName.length === 0) {
             detailedExerciseHistoryListEl.innerHTML = '<p class="empty-state-message">No history found for this exercise.</p>';
             document.getElementById('detailed-exercise-chart-container').style.display = 'none';
@@ -1318,26 +1328,30 @@ document.addEventListener('DOMContentLoaded', () => {
             toggleHistoryViewBtn.textContent = 'Show All History';
             // Identify the specific exercise instance (original exercise_id) of the most recent set
             const mostRecentSetOverall = allSetsForExerciseName[0];
-            if (!mostRecentSetOverall) { // Should be caught by earlier check but good to be safe
-                console.error("No sets found in allSetsForExerciseName for lastInstance logic.");
+            if (!mostRecentSetOverall) {
+                console.error("[renderDetailedExerciseView] No sets found in allSetsForExerciseName for lastInstance logic (this should have been caught earlier).");
                 setsToDisplay = [];
             } else {
                 const lastPerformedExerciseInstanceId = mostRecentSetOverall.exercise_id;
-                console.log("Last performed exercise_id (for instance):", lastPerformedExerciseInstanceId); // DEBUG
+                console.log("[renderDetailedExerciseView] Target lastPerformedExerciseInstanceId:", lastPerformedExerciseInstanceId); // INTENSIVE DEBUG
+                console.log("[renderDetailedExerciseView] Length of allSetsForExerciseName before filter:", allSetsForExerciseName.length); // INTENSIVE DEBUG
 
-                // Filter to get all sets belonging to that last performed exercise instance
-                setsToDisplay = allSetsForExerciseName.filter(
-                    s => s.exercise_id === lastPerformedExerciseInstanceId
-                );
-                console.log("Sets after filtering for lastInstance:", JSON.parse(JSON.stringify(setsToDisplay))); // DEBUG (deep copy for logging)
-                // Sort these sets by their actual recorded timestamp for display order (oldest to newest for that instance)
-                setsToDisplay.sort((a,b) => a.timestamp - b.timestamp);
+                setsToDisplay = allSetsForExerciseName.filter(s => {
+                    const match = s.exercise_id === lastPerformedExerciseInstanceId;
+                    // INTENSIVE DEBUG - Log each comparison
+                    // console.log(`  [Filter] Set ID: ${s.id}, Set ExID: ${s.exercise_id}, Target ExID: ${lastPerformedExerciseInstanceId}, Match: ${match}`);
+                    return match;
+                });
+                console.log("[renderDetailedExerciseView] Length of setsToDisplay after filter:", setsToDisplay.length); // INTENSIVE DEBUG
+                console.log("[renderDetailedExerciseView] Sets after filtering for lastInstance:", JSON.parse(JSON.stringify(setsToDisplay.map(s => ({id: s.id, exercise_id: s.exercise_id, timestamp: s.timestamp}))))); // Log relevant parts
+
+                setsToDisplay.sort((a,b) => a.timestamp - b.timestamp); // Sort oldest first for display
             }
         } else { // 'allHistory'
-            console.log("Setting to display allHistory."); // DEBUG
+            console.log("[renderDetailedExerciseView] Setting to display allHistory."); // INTENSIVE DEBUG
             toggleHistoryViewBtn.textContent = 'Show Last Session Only';
             setsToDisplay = [...allSetsForExerciseName].sort((a,b) => a.timestamp - b.timestamp); // oldest first for display
-            console.log("Sets for allHistory display:", JSON.parse(JSON.stringify(setsToDisplay))); // DEBUG
+            console.log("[renderDetailedExerciseView] Sets for allHistory display (count):", setsToDisplay.length); // INTENSIVE DEBUG
         }
 
 
@@ -2184,7 +2198,7 @@ document.addEventListener('DOMContentLoaded', () => {
             } else {
                 detailedHistoryViewMode = 'lastInstance';
             }
-            console.log("Toggled detailedHistoryViewMode to:", detailedHistoryViewMode); // DEBUG
+            console.log("[ToggleBtn] Toggled detailedHistoryViewMode to:", detailedHistoryViewMode); // INTENSIVE DEBUG
             if (currentViewingExerciseName) { // Ensure there's an exercise context
                 renderDetailedExerciseView(currentViewingExerciseName);
             }
