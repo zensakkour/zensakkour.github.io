@@ -1,4 +1,4 @@
-import { supabaseClient, loadData, loadUserProfile } from './api.js';
+import { supabaseClient, loadData, loadUserProfile, updateUsernameAPI } from './api.js';
 import * as state from './state.js';
 import * as dom from './domElements.js';
 import { showFeedback } from './ui/renderUtils.js';
@@ -11,7 +11,6 @@ import {
 } from './ui/exerciseView.js'; // Import actual exercise/set render functions
 import { renderBodyWeightHistory } from './ui/bodyWeightView.js'; // Import actual
 import { populateExerciseSelect, handleAnalysisTypeChange } from './ui/analysisView.js'; // Import actual
-import { updateUsernameAPI } from '../api.js'; // Import for profile username update
 
 // placeholderRenderer is no longer needed as all its functions are directly imported and used.
 
