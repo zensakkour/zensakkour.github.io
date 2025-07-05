@@ -176,3 +176,31 @@ export function updateActiveNavLink(currentAppView) {
         activeNavLink.classList.add('active');
     }
 }
+
+export function setupMobileNavToggle() {
+    const hamburgerBtn = document.getElementById('hamburger-menu-btn');
+    const navUl = document.querySelector('nav ul');
+
+    if (hamburgerBtn && navUl) {
+        hamburgerBtn.addEventListener('click', () => {
+            navUl.classList.toggle('nav-open');
+            hamburgerBtn.classList.toggle('active'); // For 'X' icon state
+            // Update aria-expanded attribute for accessibility
+            const isExpanded = navUl.classList.contains('nav-open');
+            hamburgerBtn.setAttribute('aria-expanded', isExpanded.toString());
+        });
+
+        // Optional: Close menu when a nav link is clicked
+        navUl.querySelectorAll('a').forEach(link => {
+            link.addEventListener('click', () => {
+                if (navUl.classList.contains('nav-open')) {
+                    navUl.classList.remove('nav-open');
+                    hamburgerBtn.classList.remove('active');
+                    hamburgerBtn.setAttribute('aria-expanded', 'false');
+                }
+            });
+        });
+    } else {
+        console.warn("Hamburger button or nav ul not found for mobile nav setup.");
+    }
+}

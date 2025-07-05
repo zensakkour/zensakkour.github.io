@@ -6,6 +6,7 @@ import { setupExerciseEventListeners } from './ui/exerciseView.js';
 import { setupBodyWeightEventListeners } from './ui/bodyWeightView.js';
 import { setupAnalysisEventListeners } from './ui/analysisView.js';
 import { setupProfileEventListeners } from './auth.js'; // Profile listeners are in auth.js
+import { setupMobileNavToggle } from './ui/viewManager.js'; // Import the new toggle function
 
 
 console.log("app.js loaded");
@@ -22,7 +23,8 @@ document.addEventListener('DOMContentLoaded', () => {
     setupExerciseEventListeners();
     setupBodyWeightEventListeners();
     setupAnalysisEventListeners();
-    setupProfileEventListeners(); // Call actual
+    setupProfileEventListeners();
+    setupMobileNavToggle(); // Setup the hamburger menu toggle
 
     // Ensure body weight nav link is present (moved from original script.js)
     // This is an idempotent check.
