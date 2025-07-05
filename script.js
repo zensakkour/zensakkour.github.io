@@ -1,24 +1,6 @@
 document.addEventListener('DOMContentLoaded', () => {
     console.log("JavaScript file loaded and DOM fully parsed.");
 
-    // Utility function for YYYY-MM-DD formatting
-    function getYYYYMMDD(dateObj) {
-        if (!(dateObj instanceof Date) || isNaN(dateObj.getTime())) {
-            // Handle invalid date input if necessary, or let it error downstream
-            // For now, assume valid Date object is passed
-            const d = new Date(); // Fallback or throw error
-            console.warn("Invalid date passed to getYYYYMMDD, using current date as fallback:", dateObj)
-            const year = d.getFullYear();
-            const month = (d.getMonth() + 1).toString().padStart(2, '0');
-            const day = d.getDate().toString().padStart(2, '0');
-            return `${year}-${month}-${day}`;
-        }
-        const year = dateObj.getFullYear();
-        const month = (dateObj.getMonth() + 1).toString().padStart(2, '0');
-        const day = dateObj.getDate().toString().padStart(2, '0');
-        return `${year}-${month}-${day}`;
-    }
-
     // Supabase Client Initialization
     const SUPABASE_URL = 'https://cdbbaurycauyhlymmaec.supabase.co';
     const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNkYmJhdXJ5Y2F1eWhseW1tYWVjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTE2Mzc3NTcsImV4cCI6MjA2NzIxMzc1N30.gSMNIDm41JT6Ze79qawcqjIAn8Y4QsnwoXXRgzpv62s';
@@ -960,68 +942,27 @@ document.addEventListener('DOMContentLoaded', () => {
         // Display sets for the CURRENT exercise instance
         if (!exercise.sets || exercise.sets.length === 0) {
             setsListDiv.innerHTML = '<p class="empty-state-message">No sets recorded for this instance. Add one below.</p>';
+            // Placeholders are already set above
             return;
         }
 
-        const setsByDate = {};
-        exercise.sets.forEach(set => {
-            const setTimestamp = set.timestamp instanceof Date ? set.timestamp : new Date(set.timestamp);
-            if (isNaN(setTimestamp.getTime())) {
-                console.warn("Skipping set with invalid timestamp in renderSetsForExercise:", set);
-                return;
-            }
-
-            const dateKey = getYYYYMMDD(setTimestamp); // Use utility function
-            if (!setsByDate[dateKey]) {
-                setsByDate[dateKey] = [];
-            }
-            setsByDate[dateKey].push(set);
+        // Sort sets for the current instance by timestamp (creation time)
+        const sortedSetsCurrentInstance = [...exercise.sets].sort((a,b) => {
+            const timeA = typeof a.timestamp === 'string' ? new Date(a.timestamp) : a.timestamp;
+            const timeB = typeof b.timestamp === 'string' ? new Date(b.timestamp) : b.timestamp;
+            return timeA - timeB;
         });
 
-        const sortedDateKeys = Object.keys(setsByDate).sort((a, b) => {
-            // Ensure comparison is robust for date strings
-            const dateA = new Date(a.split('-')[0], parseInt(a.split('-')[1]) - 1, a.split('-')[2]);
-            const dateB = new Date(b.split('-')[0], parseInt(b.split('-')[1]) - 1, b.split('-')[2]);
-            return dateB - dateA; // Most recent date first
-        });
+        sortedSetsCurrentInstance.forEach((set, index) => {
+            const setItemContainer = document.createElement('div');
+            setItemContainer.className = 'set-item';
+            const setDetails = document.createElement('span');
+            const setTime = set.timestamp instanceof Date ? set.timestamp : new Date(set.timestamp);
+            const formattedTimestamp = `${setTime.toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: '2-digit' })} ${setTime.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}`;
+            setDetails.textContent = `Set ${index + 1} (${formattedTimestamp}): ${set.weight} kg x ${set.reps} reps`;
+            if(set.notes) setDetails.textContent += ` (${set.notes})`;
 
-        if (sortedDateKeys.length === 0 && exercise.sets.length > 0) {
-             console.warn("No valid date keys generated in renderSetsForExercise, though sets exist.");
-             setsListDiv.innerHTML = '<p class="empty-state-message">Error processing set dates.</p>';
-             return;
-        }
-         if (sortedDateKeys.length === 0 && exercise.sets.length === 0) { //This is already handled at the top
-            // setsListDiv.innerHTML = '<p class="empty-state-message">No sets recorded for this instance. Add one below.</p>';
-            return;
-         }
-
-
-        sortedDateKeys.forEach(dateKey => {
-            const dateSeparator = document.createElement('div');
-            dateSeparator.className = 'date-separator';
-            // Create Date object from YYYY-MM-DD for reliable formatting
-            const parts = dateKey.split('-');
-            const displayDate = new Date(parts[0], parseInt(parts[1]) - 1, parts[2]);
-            dateSeparator.textContent = `---- ${displayDate.toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' })} ----`;
-            setsListDiv.appendChild(dateSeparator);
-
-            const setsForThisDate = setsByDate[dateKey].sort((a,b) => { // Sort sets chronologically for the day
-                const timeA = a.timestamp instanceof Date ? a.timestamp : new Date(a.timestamp);
-                const timeB = b.timestamp instanceof Date ? b.timestamp : new Date(b.timestamp);
-                return timeA - timeB;
-            });
-
-            setsForThisDate.forEach((set, index) => {
-                const setItemContainer = document.createElement('div');
-                setItemContainer.className = 'set-item';
-                const setDetails = document.createElement('span');
-                const setTime = set.timestamp instanceof Date ? set.timestamp : new Date(set.timestamp);
-                // Display time only, as date is in separator
-                const formattedTime = setTime.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
-                setDetails.textContent = `Set ${index + 1} (${formattedTime}): ${set.weight} kg x ${set.reps} reps`;
-                if(set.notes) setDetails.textContent += ` (${set.notes})`;
-
-                const deleteBtn = document.createElement('button');
+            const deleteBtn = document.createElement('button');
             deleteBtn.innerHTML = '&times;';
             deleteBtn.className = 'delete-btn button-danger';
             deleteBtn.title = `Delete Set ${index + 1}`;
