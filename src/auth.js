@@ -178,7 +178,7 @@ export function initializeAuth() {
         const user = session ? session.user : null;
 
         if (event === 'SIGNED_OUT') {
-            placeholderViewManager.clearViewState(); // From viewManager
+            viewManager.clearViewState(); // Use actual imported viewManager
             state.setAppInitializedOnce(false);
         }
 
